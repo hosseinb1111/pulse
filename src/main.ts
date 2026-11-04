@@ -37,8 +37,6 @@ const elements = {
   currentTime: requiredElement<HTMLElement>('current-time'),
   totalTime: requiredElement<HTMLElement>('total-time'),
   seekSlider: requiredElement<HTMLInputElement>('seek-slider'),
-  rewindButton: requiredElement<HTMLButtonElement>('rewind-button'),
-  forwardButton: requiredElement<HTMLButtonElement>('forward-button'),
   volumeSlider: requiredElement<HTMLInputElement>('volume-slider'),
   volumeValue: requiredElement<HTMLOutputElement>('volume-value'),
   playButton: requiredElement<HTMLButtonElement>('play-button'),
@@ -199,8 +197,6 @@ elements.browserFileInput.addEventListener('change', () => {
 elements.playButton.addEventListener('click', () => void togglePlayback());
 elements.previousButton.addEventListener('click', () => void playPrevious());
 elements.nextButton.addEventListener('click', () => void playNext(true));
-elements.rewindButton.addEventListener('click', () => seekBy(-10));
-elements.forwardButton.addEventListener('click', () => seekBy(10));
 elements.shuffleButton.addEventListener('click', toggleShuffle);
 elements.repeatButton.addEventListener('click', cycleRepeatMode);
 elements.clearPlaylist.addEventListener('click', clearPlaylist);
@@ -216,7 +212,9 @@ elements.seekSlider.addEventListener('pointerdown', () => {
 elements.seekSlider.addEventListener('input', () => {
   isScrubbing = true;
   const duration = audio.getSnapshot().duration;
-  const target = duration * Number(elements.seekSlider.value) / Number(elements.seekSlider.max);
+  const progress = Number(elements.seekSlider.value) / Number(elements.seekSlider.max) * 100;
+  const target = duration * progress / 100;
+  elements.seekSlider.style.setProperty('--range-progress', `${progress}%`);
   elements.currentTime.textContent = formatTime(target);
 });
 const finishScrub = (): void => {
@@ -262,10 +260,14 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
     toggleMode();
   } else if (event.key === 'ArrowLeft') {
     event.preventDefault();
-    seekBy(-10);
+    const snapshot = audio.getSnapshot();
+    audio.seek(snapshot.currentTime - 5);
+    persistPlaybackPosition(audio.getSnapshot(), true);
   } else if (event.key === 'ArrowRight') {
     event.preventDefault();
-    seekBy(10);
+    const snapshot = audio.getSnapshot();
+    audio.seek(snapshot.currentTime + 5);
+    persistPlaybackPosition(audio.getSnapshot(), true);
   }
 });
 
@@ -761,8 +763,6 @@ function renderPlaylist(): void {
   elements.nextButton.disabled = tracks.length === 0;
   elements.playButton.disabled = tracks.length === 0;
   elements.seekSlider.disabled = tracks.length === 0;
-  elements.rewindButton.disabled = tracks.length === 0;
-  elements.forwardButton.disabled = tracks.length === 0;
   elements.shuffleButton.disabled = tracks.length < 2;
   elements.repeatButton.disabled = tracks.length === 0;
   elements.previousButton.title = activeIndex < 0 ? 'Previous track' : 'Previous track';
@@ -777,14 +777,6 @@ function renderAudioState(snapshot: AudioSnapshot): void {
   renderVolume(snapshot.volume);
   elements.seekSlider.style.setProperty('--range-progress', `${snapshot.duration > 0 ? snapshot.currentTime / snapshot.duration * 100 : 0}%`);
   renderTimeline(snapshot);
-}
-
-function seekBy(offsetSeconds: number): void {
-  if (!Number.isFinite(offsetSeconds) || tracks.length === 0 || currentTrackId === null) return;
-  const snapshot = audio.getSnapshot();
-  const target = snapshot.currentTime + offsetSeconds;
-  audio.seek(snapshot.duration > 0 ? Math.min(snapshot.duration, Math.max(0, target)) : Math.max(0, target));
-  persistPlaybackPosition(audio.getSnapshot(), true);
 }
 
 function setVolume(value: number): void {
@@ -808,10 +800,11 @@ function renderTimeline(snapshot: AudioSnapshot): void {
   elements.currentTime.textContent = formatTime(snapshot.currentTime);
   elements.totalTime.textContent = formatTime(snapshot.duration);
   if (!isScrubbing) {
-    const value = snapshot.duration > 0 ? snapshot.currentTime / snapshot.duration * Number(elements.seekSlider.max) : 0;
+    const progress = snapshot.duration > 0 ? snapshot.currentTime / snapshot.duration * 100 : 0;
+    const value = progress / 100 * Number(elements.seekSlider.max);
     elements.seekSlider.value = String(Math.round(value));
+    elements.seekSlider.style.setProperty('--range-progress', `${progress}%`);
   }
-  elements.seekSlider.style.setProperty('--range-progress', `${snapshot.duration > 0 ? snapshot.currentTime / snapshot.duration * 100 : 0}%`);
 }
 
 function persistPlaybackPosition(snapshot: AudioSnapshot, force: boolean): void {
