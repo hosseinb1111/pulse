@@ -1,0 +1,256 @@
+/* Design tokens. JavaScript (themes.ts) overwrites the colour tokens inline for the chosen theme and mode;
+   these values are only the first paint before the script runs. */
+:root {
+  color-scheme: dark;
+  --bg: #070912;
+  --surface: rgba(15, 19, 35, 0.72);
+  --surface-strong: rgba(16, 21, 39, 0.96);
+  --text: #f4f6ff;
+  --muted: #939ab4;
+  --muted-soft: #6e7693;
+  --line: rgba(201, 214, 255, 0.12);
+  --line-strong: rgba(201, 214, 255, 0.2);
+  --shade-rgb: 7, 9, 18;
+  --danger: #ff8b9c;
+  --success: #75e5c0;
+  --accent: #9a8cff;
+  --accent-strong: #b5aaff;
+  --accent-ink: #101326;
+  --accent-2: #6be7e0;
+
+  --radius-lg: 28px;
+  --radius-md: 16px;
+  --radius-sm: 10px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --card-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.6);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+:root[data-mode="light"] {
+  --card-shadow: 0 30px 70px -36px rgba(40, 42, 60, 0.35);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 62% 52% at 8% -8%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 72%),
+    radial-gradient(ellipse 48% 44% at 100% 100%, color-mix(in srgb, var(--accent-2) 9%, transparent), transparent 74%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.4s var(--ease), color 0.4s var(--ease), background-image 0.4s var(--ease);
+}
+
+body.playlist-open,
+body.settings-open {
+  overflow: hidden;
+}
+
+button,
+input,
+output {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+
+/* Theme-aware selection; native editable controls keep their platform selection colours. */
+::selection {
+  background: color-mix(in srgb, var(--accent) 86%, black);
+  color: var(--accent-ink);
+  text-shadow: none;
+}
+
+::-moz-selection {
+  background: color-mix(in srgb, var(--accent) 86%, black);
+  color: var(--accent-ink);
+  text-shadow: none;
+}
+
+input::selection,
+textarea::selection,
+[contenteditable="true"]::selection,
+[contenteditable="true"] *::selection,
+[data-code-editor]::selection,
+[data-code-editor] *::selection,
+.monaco-editor ::selection,
+.cm-content ::selection {
+  background: Highlight;
+  color: HighlightText;
+}
+
+input::-moz-selection,
+textarea::-moz-selection,
+[contenteditable="true"]::-moz-selection,
+[contenteditable="true"] *::-moz-selection,
+[data-code-editor]::-moz-selection,
+[data-code-editor] *::-moz-selection,
+.monaco-editor ::-moz-selection,
+.cm-content ::-moz-selection {
+  background: Highlight;
+  color: HighlightText;
+}
+
+/* Icons are stroked line art by default; solid glyphs opt in with .is-solid or the classes below. */
+svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  /* No border-radius here: the outline follows each element's own shape, so round buttons stay round when focused. */
+}
+
+.visually-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  color: var(--muted-soft);
+  text-transform: uppercase;
+}
+
+.brand-period {
+  color: var(--accent-2);
+}
+
+/* Toasts */
+.toast-region {
+  position: fixed;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 70;
+  width: min(92vw, 420px);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 18px 50px -20px rgba(0, 0, 0, 0.6);
+  font-size: 0.9rem;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.22s var(--ease), transform 0.22s var(--ease);
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.toast-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+
+.toast-success .toast-marker {
+  background: var(--success);
+}
+
+.toast-error .toast-marker {
+  background: var(--danger);
+}
+
+/* File drag-and-drop overlay */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--accent) 14%, rgba(0, 0, 0, 0.6));
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.drop-overlay[hidden] {
+  display: none;
+}
+
+.drop-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 48px;
+  border: 2px dashed var(--accent);
+  border-radius: 24px;
+  color: var(--text);
+  text-align: center;
+}
+
+.drop-overlay-card strong {
+  font-size: 1.3rem;
+}
+
+.drop-overlay-card span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}

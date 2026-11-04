@@ -1,0 +1,109 @@
+/* Custom pointer (see cursor.ts). Only applied with a fine pointer and when the cursor setting is not "System".
+   Position is driven by the inline `translate` property; size changes use `scale`. `scale` is applied outside `transform`,
+   so the position must never live in `transform` or pressing/hovering would scale the coordinates and move the cursor.
+   The element is centred with negative margins (half of --size), so its transform origin is exactly the pointer. */
+.cursor-ring,
+.cursor-dot {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 90;
+  pointer-events: none;
+  margin: calc(var(--size, 20px) / -2) 0 0 calc(var(--size, 20px) / -2);
+  display: none;
+  opacity: 0;
+  contain: layout paint style;
+  will-change: translate, scale;
+  transition: opacity 0.18s ease;
+}
+
+/* The system pointer is hidden only while the custom one is actually on screen,
+   so there is never a moment with no pointer at all (before the first move, after a touch, outside the window). */
+body.custom-cursor:not(.cursor-away),
+body.custom-cursor:not(.cursor-away) * {
+  cursor: none !important;
+}
+
+body.custom-cursor .cursor-ring,
+body.custom-cursor .cursor-dot {
+  display: block;
+  opacity: 1;
+}
+
+body.custom-cursor.cursor-away .cursor-ring,
+body.custom-cursor.cursor-away .cursor-dot {
+  opacity: 0;
+}
+
+/* Ring: a thin outline that swells over interactive elements.
+   Centring comes from the negative margin above, not from a transform. */
+.cursor-ring {
+  --size: 34px;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  background: rgba(255, 255, 255, 0);
+  mix-blend-mode: difference;
+  scale: 1;
+  transition: scale 0.22s var(--ease), background-color 0.2s, opacity 0.18s ease;
+}
+
+.cursor-dot {
+  --size: 6px;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: var(--accent);
+  scale: 1;
+  transition: scale 0.2s var(--ease), opacity 0.18s ease;
+}
+
+body.custom-cursor.cursor-hover .cursor-ring {
+  scale: 1.6;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+body.custom-cursor.cursor-hover .cursor-dot {
+  scale: 1.7;
+}
+
+body.custom-cursor.cursor-down .cursor-ring {
+  scale: 0.78;
+}
+
+body.custom-cursor.cursor-hover.cursor-down .cursor-ring {
+  scale: 1.25;
+}
+
+/* Halo: a soft glow with no outline and no dot */
+html[data-cursor="halo"] .cursor-ring {
+  --size: 56px;
+  border: 0;
+  mix-blend-mode: normal;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 50%, transparent) 0%, transparent 68%);
+}
+
+html[data-cursor="halo"] body.custom-cursor.cursor-hover .cursor-ring {
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 60%, transparent) 0%, transparent 68%);
+}
+
+html[data-cursor="halo"] .cursor-dot {
+  display: none !important;
+}
+
+/* Dot: only the small centre dot, no ring */
+html[data-cursor="dot"] .cursor-ring {
+  display: none !important;
+}
+
+html[data-cursor="dot"] .cursor-dot {
+  --size: 9px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-ring,
+  .cursor-dot {
+    transition: opacity 0.1s;
+  }
+}

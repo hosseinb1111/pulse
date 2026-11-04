@@ -1,0 +1,481 @@
+/* The player card */
+.player {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 22px 22px 20px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--text) 4%, var(--surface)), var(--surface) 54%, color-mix(in srgb, var(--accent) 4%, var(--surface)));
+  border: 1px solid color-mix(in srgb, var(--accent) 13%, var(--line));
+  backdrop-filter: blur(28px) saturate(1.24);
+  -webkit-backdrop-filter: blur(28px) saturate(1.2);
+  box-shadow: var(--card-shadow);
+}
+
+.player-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.player-top-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.character-state-pill {
+  max-width: 142px;
+  overflow: hidden;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--character-accent, var(--accent)) 30%, var(--line));
+  border-radius: 999px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--character-accent, var(--accent)) 7%, var(--surface));
+  font-family: var(--font-mono);
+  font-size: 0.61rem;
+  letter-spacing: 0.07em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.25s, border-color 0.25s, background 0.25s;
+}
+
+.character-state-pill[data-state="grooving"],
+.character-state-pill[data-state="excited"] {
+  color: var(--accent-strong);
+}
+
+/* Artwork: audio drives the card's glow; the live character is rendered inside it. */
+.artwork {
+  width: min(280px, 72vw);
+  aspect-ratio: 1;
+  margin: 6px auto 0;
+  display: grid;
+  place-items: center;
+}
+
+.artwork-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background:
+    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--accent-2) 34%, transparent), transparent 56%),
+    radial-gradient(circle at 72% 78%, color-mix(in srgb, var(--accent) 46%, transparent), transparent 60%),
+    var(--surface-strong);
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.22),
+    0 0 calc(30px + var(--level, 0) * 110px) color-mix(in srgb, var(--accent) 45%, transparent);
+  scale: calc(1 + var(--beat, 0) * 0.025);
+  transition: scale 0.12s linear, box-shadow 0.12s linear;
+}
+
+.artwork-ring {
+  position: absolute;
+  z-index: 1;
+  inset: 9%;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  opacity: calc(0.35 + var(--level, 0) * 0.65);
+  scale: calc(0.92 + var(--level, 0) * 0.22);
+  transition: scale 0.1s linear, opacity 0.1s linear;
+}
+
+.artwork-ring-two {
+  inset: 22%;
+  border-color: color-mix(in srgb, var(--accent-2) 60%, transparent);
+  scale: calc(0.95 + var(--beat, 0) * 0.14);
+}
+
+/* A slow spin while music plays, so the cover feels alive even in quiet passages */
+body.is-playing .artwork-ring-one {
+  animation: spin 16s linear infinite;
+}
+
+body.is-playing .artwork-ring-two {
+  animation: spin 9s linear infinite reverse;
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.artwork-core {
+  position: relative;
+  z-index: 2;
+  width: 34%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-ink);
+  box-shadow: 0 12px 34px -12px var(--accent);
+  scale: calc(1 + var(--beat, 0) * 0.08);
+  transition: scale 0.1s linear;
+}
+
+.artwork-core svg {
+  width: 66%;
+  height: 66%;
+}
+
+/* Track heading */
+.track-heading {
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.track-heading h1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: clamp(1.2rem, 4vw, 1.45rem);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.track-subtitle {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Range sliders (seek and volume, and the settings slider) */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  --range-progress: 0%;
+}
+
+.range-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--accent) var(--range-progress), var(--line-strong) var(--range-progress));
+}
+
+.range-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+
+.range-slider::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 3px solid var(--accent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s var(--ease);
+}
+
+.range-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 3px solid var(--accent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.range-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.range-slider:focus-visible {
+  outline: none;
+}
+
+.range-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.range-slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.timeline {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-label {
+  min-width: 3.2em;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline .time-label:last-child {
+  text-align: right;
+}
+
+/* Transport controls */
+.player-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.control-button {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  transition: background 0.2s, color 0.2s, transform 0.2s var(--ease), box-shadow 0.2s;
+}
+
+.control-button svg {
+  width: 24px;
+  height: 24px;
+}
+
+.control-button:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.control-button:active {
+  transform: scale(0.92);
+}
+
+.control-button:disabled {
+  opacity: 0.35;
+}
+
+.secondary-control {
+  width: 44px;
+  height: 44px;
+  color: var(--muted);
+}
+
+.secondary-control.is-active {
+  color: var(--accent);
+}
+
+.repeat-one-indicator {
+  position: absolute;
+  right: 7px;
+  bottom: 6px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.repeat-one-indicator[hidden] {
+  display: none;
+}
+
+.play-button {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--accent-ink);
+  box-shadow: 0 16px 40px -14px var(--accent);
+  transition: transform 0.2s var(--ease), box-shadow 0.3s;
+}
+
+.play-button svg {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.play-button:hover {
+  transform: scale(1.04);
+}
+
+.play-button:active {
+  transform: scale(0.96);
+}
+
+.play-button:disabled {
+  opacity: 0.4;
+}
+
+.play-icon {
+  margin-left: 3px;
+}
+
+.pause-icon {
+  display: none;
+}
+
+.play-button.is-playing .play-icon {
+  display: none;
+}
+
+.play-button.is-playing .pause-icon {
+  display: block;
+  margin-left: 0;
+}
+
+/* Bottom row: queue toggle and volume */
+.bottom-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.playlist-toggle {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: border-color 0.2s, color 0.2s, background 0.2s, transform 0.2s var(--ease), box-shadow 0.2s;
+}
+
+.playlist-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.playlist-toggle:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-strong));
+  transform: translateY(-1px);
+}
+
+.playlist-toggle:active {
+  transform: scale(0.97);
+}
+
+.playlist-toggle[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.queue-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.volume-control {
+  width: min(226px, 58%);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+}
+
+.volume-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.volume-slider {
+  flex: 1;
+  min-width: 42px;
+}
+
+.volume-value {
+  min-width: 3.15em;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.69rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Permission guidance is inline with the player, so a blocked microphone always has a clear retry path. */
+.mic-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+}
+
+.mic-status[hidden] {
+  display: none;
+}
+
+.mic-status-message {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.mic-retry {
+  flex: none;
+  color: var(--accent-strong);
+  white-space: nowrap;
+}
+
+body.is-listening .artwork-ring-one {
+  animation: spin 16s linear infinite;
+}
+
+body.is-listening .artwork-ring-two {
+  animation: spin 9s linear infinite reverse;
+}

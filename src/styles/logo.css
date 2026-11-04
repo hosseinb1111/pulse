@@ -1,0 +1,149 @@
+/* Pulse's mark is a compact ECG trace: a soft colour aura, a crisp path and a moving spark. */
+.pulse-glyph {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  scale: calc(1 + var(--bass, 0) * 0.045 + var(--beat, 0) * 0.018);
+  transform-origin: center;
+  will-change: scale, filter;
+  filter: drop-shadow(0 0 calc(2px + var(--bass, 0) * 6px) color-mix(in srgb, var(--accent) 60%, transparent));
+}
+
+.pulse-glyph .pulse-line,
+.pulse-glyph .pulse-trace,
+.pulse-glyph .pulse-aura {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pulse-glyph .pulse-aura {
+  stroke: var(--accent-2);
+  stroke-width: 12;
+  opacity: calc(0.08 + var(--bass, 0) * 0.28);
+  filter: blur(3px);
+  transition: opacity 100ms linear;
+}
+
+.pulse-glyph .pulse-line {
+  stroke: currentColor;
+  stroke-width: 5.2;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor 55%, transparent));
+  animation: pulse-draw 0.9s var(--ease) 0.15s both;
+}
+
+.pulse-glyph .pulse-trace {
+  stroke: #fff;
+  stroke-width: 5.4;
+  stroke-dasharray: 14 86;
+  stroke-dashoffset: 14;
+  opacity: 0.12;
+  filter: drop-shadow(0 0 4px #fff);
+  /* Stay mounted while idle: toggling playback only changes opacity, never animation phase. */
+  animation: pulse-trace 2.4s linear infinite;
+  animation-play-state: running;
+  transition: opacity 240ms ease;
+}
+
+body.is-playing .pulse-glyph .pulse-trace,
+body.is-listening .pulse-glyph .pulse-trace {
+  opacity: 0.92;
+}
+
+.pulse-glyph .pulse-dot {
+  fill: currentColor;
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  scale: calc(1 + var(--beat, 0) * 0.45 + var(--bass, 0) * 0.18);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent-2) 70%, transparent));
+}
+
+.pulse-glyph .pulse-ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: calc(var(--beat, 0) * 0.75 + var(--bass, 0) * 0.12);
+  scale: calc(0.75 + var(--beat, 0) * 0.55 + var(--bass, 0) * 0.12);
+}
+
+@keyframes pulse-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes pulse-trace {
+  from { stroke-dashoffset: 14; }
+  /* 14 → -86 is exactly one 100-unit dash cycle, so the wrap has no positional jump. */
+  to { stroke-dashoffset: -86; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-glyph .pulse-trace { animation: none !important; }
+  .pulse-glyph .pulse-line { animation: none !important; stroke-dashoffset: 0; }
+}
+
+
+/* In light appearance the mark sits on brighter surfaces, so give its ECG trace
+   a darker, more saturated tile and a clearer two-stage glow. */
+:root[data-mode="light"] .brand-mark {
+  background: linear-gradient(138deg,
+    color-mix(in srgb, var(--accent) 88%, #182038),
+    color-mix(in srgb, var(--accent-2) 78%, #17243b));
+  box-shadow:
+    0 10px 24px -8px color-mix(in srgb, var(--accent) 58%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -2px 0 rgba(8, 12, 28, 0.22);
+  scale: calc(1 + var(--beat, 0) * 0.105 + var(--bass, 0) * 0.025);
+}
+
+:root[data-mode="light"] .pulse-glyph {
+  filter:
+    drop-shadow(0 0 3px rgba(255, 255, 255, 0.48))
+    drop-shadow(0 0 calc(3px + var(--bass, 0) * 7px) color-mix(in srgb, var(--accent-2) 82%, transparent));
+  scale: calc(1 + var(--bass, 0) * 0.065 + var(--beat, 0) * 0.04);
+}
+
+:root[data-mode="light"] .pulse-glyph .pulse-aura {
+  stroke: color-mix(in srgb, var(--accent-2) 82%, white);
+  stroke-width: 14;
+  opacity: calc(0.2 + var(--bass, 0) * 0.44 + var(--beat, 0) * 0.2);
+  filter: blur(3.4px);
+}
+
+:root[data-mode="light"] .pulse-glyph .pulse-line {
+  stroke: #fff;
+  stroke-width: 5.8;
+  filter:
+    drop-shadow(0 0 2px rgba(255, 255, 255, 0.9))
+    drop-shadow(0 0 4px color-mix(in srgb, var(--accent-2) 70%, transparent));
+}
+
+:root[data-mode="light"] .pulse-glyph .pulse-trace {
+  stroke: #fff;
+  stroke-width: 6.2;
+  opacity: 0.24;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.95));
+}
+
+:root[data-mode="light"] body.is-playing .pulse-glyph .pulse-trace,
+:root[data-mode="light"] body.is-listening .pulse-glyph .pulse-trace {
+  opacity: 1;
+}
+
+:root[data-mode="light"] .pulse-glyph .pulse-ring {
+  stroke: #fff;
+  stroke-width: 2.1;
+  opacity: calc(var(--beat, 0) * 0.95 + var(--bass, 0) * 0.2);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent-2) 88%, transparent));
+}
+
+:root[data-mode="light"] .pulse-glyph .pulse-dot {
+  fill: #fff;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 0 6px color-mix(in srgb, var(--accent-2) 85%, transparent));
+}

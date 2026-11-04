@@ -1,0 +1,154 @@
+/* Phones and small windows: the drawers go full width, the top bar collapses, the player scales down */
+@media (max-width: 640px) {
+  .top-add-button {
+    display: none;
+  }
+
+  .mobile-add-button {
+    display: grid;
+  }
+
+  .mic-button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+
+  .mic-button span {
+    display: none;
+  }
+
+  .library-count {
+    display: none;
+  }
+
+  .player {
+    gap: 18px;
+    padding: 18px 16px 16px;
+  }
+
+  .artwork {
+    width: min(230px, 66vw);
+  }
+
+  .player-controls {
+    gap: 8px;
+  }
+
+  .control-button {
+    width: 46px;
+    height: 46px;
+  }
+
+  .secondary-control {
+    width: 40px;
+    height: 40px;
+  }
+
+  .play-button {
+    width: 64px;
+    height: 64px;
+  }
+
+  .drawer {
+    width: 100%;
+  }
+
+  #theme-options {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Short desktop windows: shrink the artwork so the whole player and footer fit without scrolling */
+@media (min-width: 641px) and (max-height: 860px) {
+  .artwork {
+    width: min(220px, 34vh);
+  }
+
+  .player {
+    gap: 16px;
+  }
+
+  .main-content {
+    padding: 8px 0;
+  }
+
+  .app-footer {
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .volume-control {
+    width: 54%;
+    gap: 5px;
+  }
+
+  .volume-icon {
+    display: none;
+  }
+
+  .volume-value {
+    min-width: 2.8em;
+    font-size: 0.64rem;
+  }
+
+  .timeline {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 360px) {
+  .bottom-controls {
+    gap: 8px;
+  }
+
+  .playlist-toggle {
+    gap: 6px;
+    padding-inline: 9px;
+    font-size: 0.8rem;
+  }
+
+  .volume-control {
+    width: 57%;
+  }
+
+  #character-vibe-options {
+    grid-template-columns: 1fr;
+  }
+
+  #character-vibe-options .choice {
+    min-height: 58px;
+  }
+}
+
+/* Touch screens have no hover, so the custom pointer is never shown there */
+@media (hover: none) {
+  .cursor-ring,
+  .cursor-dot {
+    display: none !important;
+  }
+}
+
+/* Respect the system setting for reduced motion. The scenes also halve their reaction strength (scenes.ts). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .footer-bottom .heart,
+  .footer-bottom .coffee {
+    animation: none !important;
+  }
+
+  .github-link {
+    transition: none !important;
+  }
+}

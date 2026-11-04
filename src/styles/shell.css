@@ -1,0 +1,346 @@
+/* Full-screen visualizer and the scrim that keeps text readable over it */
+#visualizer-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+/* Beat-reactive theme: one fixed layer whose opacity the beat drives (themes.ts). Inert for every other theme. */
+.beat-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(var(--beat-rgb, 255, 90, 208), 0.28) 0%, rgba(var(--beat-rgb, 255, 90, 208), 0.08) 45%, transparent 75%),
+    radial-gradient(ellipse at 50% 120%, rgba(var(--beat-rgb, 255, 90, 208), 0.22) 0%, transparent 60%);
+  will-change: opacity;
+}
+
+/* Calm mode is genuinely blank: suppress the separate full-screen beat flash too. */
+.visualizer-calm .beat-glow {
+  opacity: 0 !important;
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 14% 14%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 52%),
+    radial-gradient(ellipse at 88% 82%, color-mix(in srgb, var(--accent-2) 7%, transparent) 0%, transparent 48%),
+    radial-gradient(ellipse at 50% 38%, rgba(var(--shade-rgb), 0) 0%, rgba(var(--shade-rgb), 0.34) 72%),
+    linear-gradient(180deg, rgba(var(--shade-rgb), 0.04), rgba(var(--shade-rgb), 0.36));
+}
+
+:root[data-mode="light"] .scrim {
+  background:
+    radial-gradient(ellipse at 12% 10%, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 56%),
+    radial-gradient(ellipse at 90% 84%, color-mix(in srgb, var(--accent-2) 9%, transparent) 0%, transparent 52%),
+    radial-gradient(ellipse at 50% 44%, rgba(var(--shade-rgb), 0) 0%, rgba(var(--shade-rgb), 0.075) 78%),
+    linear-gradient(180deg, rgba(var(--shade-rgb), 0.005), rgba(var(--shade-rgb), 0.07));
+}
+
+.app-shell {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: max(14px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 4px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand-mark {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(140deg, var(--accent), var(--accent-2));
+  color: var(--accent-ink);
+  box-shadow:
+    0 10px calc(26px + var(--beat, 0) * 20px) -12px var(--accent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14);
+  scale: calc(1 + var(--beat, 0) * 0.07);
+  transition: scale 0.1s linear, rotate 0.3s var(--ease);
+}
+
+/* A soft highlight in the top-left corner gives the tile some depth. */
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 28% 16%, rgba(255, 255, 255, 0.38), transparent 58%);
+  pointer-events: none;
+}
+
+.brand-mark svg {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+.brand:hover .brand-mark {
+  rotate: -5deg;
+}
+
+.brand-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.library-count {
+  margin-right: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Buttons */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: transform 0.2s var(--ease), border-color 0.2s, background 0.2s, box-shadow 0.2s, filter 0.2s;
+}
+
+.button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+}
+
+.button-primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+  box-shadow: 0 10px 30px -12px var(--accent);
+}
+
+.button-primary:hover {
+  border-color: transparent;
+  background: var(--accent-strong);
+  box-shadow: 0 12px 32px -12px var(--accent);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(0) scale(0.975);
+}
+
+.button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: border-color 0.2s, background 0.2s, transform 0.2s var(--ease), box-shadow 0.2s;
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.icon-button:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-strong));
+  box-shadow: 0 6px 18px -14px var(--accent);
+  transform: translateY(-1px);
+}
+
+.icon-button:active {
+  transform: scale(0.94);
+}
+
+.mobile-add-button {
+  display: none;
+}
+
+.text-button {
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: color 0.2s, background 0.2s, transform 0.2s var(--ease);
+}
+
+.text-button:hover {
+  color: var(--text);
+}
+
+/* Small status pieces */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--success);
+  animation: live-pulse 2.6s infinite;
+}
+
+body.is-playing .live-dot {
+  animation-duration: 1.2s;
+}
+
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.scene-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Layout */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.app-footer {
+  width: min(440px, 100%);
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  color: var(--muted-soft);
+  text-transform: uppercase;
+}
+
+.footer-right {
+  text-align: right;
+}
+
+/* Live microphone control lives beside the library and stays visually quiet until active. */
+.mic-button {
+  flex: none;
+  height: 40px;
+  padding: 0 13px;
+  gap: 8px;
+  color: var(--muted);
+  background: var(--surface);
+  border-color: var(--line);
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.mic-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.mic-button.is-active {
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 72%, transparent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent), 0 0 24px -12px var(--accent);
+}
+
+.mic-button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
