@@ -1,0 +1,89 @@
+/* Pulse's mark is a compact ECG trace: a soft colour aura, a crisp path and a moving spark. */
+.pulse-glyph {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  scale: calc(1 + var(--bass, 0) * 0.045 + var(--beat, 0) * 0.018);
+  transform-origin: center;
+  filter: drop-shadow(0 0 calc(2px + var(--bass, 0) * 6px) color-mix(in srgb, var(--accent) 60%, transparent));
+  transition: scale 90ms linear, filter 120ms linear;
+}
+
+.pulse-glyph .pulse-line,
+.pulse-glyph .pulse-trace,
+.pulse-glyph .pulse-aura {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pulse-glyph .pulse-aura {
+  stroke: var(--accent-2);
+  stroke-width: 12;
+  opacity: calc(0.08 + var(--bass, 0) * 0.28);
+  filter: blur(3px);
+  transition: opacity 100ms linear;
+}
+
+.pulse-glyph .pulse-line {
+  stroke: currentColor;
+  stroke-width: 5.2;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, currentColor 55%, transparent));
+  animation: pulse-draw 0.9s var(--ease) 0.15s both;
+}
+
+.pulse-glyph .pulse-trace {
+  stroke: #fff;
+  stroke-width: 5.4;
+  stroke-dasharray: 14 86;
+  stroke-dashoffset: 14;
+  opacity: 0;
+  filter: drop-shadow(0 0 4px #fff);
+}
+
+body.is-playing .pulse-glyph .pulse-trace,
+body.is-listening .pulse-glyph .pulse-trace {
+  opacity: 0.92;
+  animation: pulse-trace 1.8s linear infinite;
+}
+
+.pulse-glyph .pulse-dot {
+  fill: currentColor;
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  scale: calc(1 + var(--beat, 0) * 0.45 + var(--bass, 0) * 0.18);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent-2) 70%, transparent));
+  animation: pulse-fade 0.4s ease 0.8s both;
+}
+
+.pulse-glyph .pulse-ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: calc(var(--beat, 0) * 0.75 + var(--bass, 0) * 0.12);
+  scale: calc(0.75 + var(--beat, 0) * 0.55 + var(--bass, 0) * 0.12);
+}
+
+@keyframes pulse-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes pulse-trace {
+  from { stroke-dashoffset: 14; }
+  to { stroke-dashoffset: -100; }
+}
+
+@keyframes pulse-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-glyph { transition: none; }
+  .pulse-glyph .pulse-trace { animation: none !important; }
+}

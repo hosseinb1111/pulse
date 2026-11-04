@@ -1,0 +1,106 @@
+/* Footer credit block (sits right after .app-footer inside <main>). */
+.footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* Same width as .app-footer so the divider lines up with the player card. */
+  width: min(440px, 100%);
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line, #ddd5c9);
+  color: var(--muted, #a29a90);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.footer-bottom .heart,
+.footer-bottom .coffee {
+  display: inline-block;
+  font-size: 1em;
+  line-height: 1;
+  transform-origin: center;
+}
+
+.footer-bottom .heart {
+  animation: heart-beat 1.8s ease-in-out infinite;
+}
+
+@keyframes heart-beat {
+  0%, 100% { transform: scale(1); }
+  15%      { transform: scale(1.25); }
+  30%      { transform: scale(1); }
+  45%      { transform: scale(1.15); }
+}
+
+.footer-bottom .coffee {
+  animation: coffee-bob 2.6s ease-in-out infinite;
+}
+
+@keyframes coffee-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  40%      { transform: translateY(-2px) rotate(-6deg); }
+  70%      { transform: translateY(0) rotate(3deg); }
+}
+
+.footer-bottom .credit-name {
+  color: var(--text, #242321);
+  font-weight: 700;
+}
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 2px;
+  color: var(--text, #242321);
+  /* The page has no --fact-bg; --surface-strong is its equivalent raised surface. */
+  background: var(--fact-bg, var(--surface-strong, #f7f2e9));
+  border: 1px solid var(--line, #ddd5c9);
+  border-radius: 50%;
+  text-decoration: none;
+  transition: transform 0.22s ease, background 0.22s ease,
+              color 0.22s ease, border-color 0.22s ease;
+}
+
+.github-link:hover {
+  transform: scale(1.12) translateY(-1px);
+  background: var(--accent, #dc8427);
+  /* --accent-ink keeps the icon readable on every theme's accent (white fails on light accents). */
+  color: var(--accent-ink, #fff);
+  border-color: var(--accent, #dc8427);
+}
+
+.github-link:active {
+  transform: scale(0.94);
+}
+
+.github-link:focus-visible {
+  outline: 2px solid var(--accent, #dc8427);
+  outline-offset: 3px;
+}
+
+.github-link svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+@media (max-width: 400px) {
+  .footer-bottom {
+    font-size: 0.65rem;
+  }
+}
+
+/* Short windows: keep the credit compact so the player still fits without scrolling. */
+@media (max-height: 860px) {
+  .footer-bottom {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+}
