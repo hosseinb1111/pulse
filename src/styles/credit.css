@@ -84,11 +84,13 @@
   outline-offset: 3px;
 }
 
+/* The link retains the original filled Octocat mark from the base Pulse project. */
 .github-link svg {
   display: block;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   fill: currentColor;
+  stroke: none;
 }
 
 @media (max-width: 400px) {

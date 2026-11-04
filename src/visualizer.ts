@@ -5,7 +5,7 @@ import { BackgroundInput } from './pointer';
 import { PointerLayer } from './pointer-layer';
 import { currentPalette, updateBeatTheme } from './themes';
 
-type FrameListener = (frame: AudioFrame) => void;
+type FrameListener = (frame: AudioFrame, dt: number) => void;
 
 /**
  * Owns the background canvas: sizes it for the screen, reads audio every frame,
@@ -39,6 +39,7 @@ export class Visualizer {
     this.analysis = new AudioAnalysis(analyser);
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.scene = SCENES[settings.get().scene];
+    document.body.classList.toggle('visualizer-calm', this.scene.id === 'aurora');
     this.scene.enter?.();
 
     this.unsubscribe = settings.subscribe((next) => this.setScene(next.scene));
@@ -54,7 +55,7 @@ export class Visualizer {
     this.analysis = new AudioAnalysis(analyser);
   }
 
-  /** Registers a callback that receives the audio frame after each draw. */
+  /** Registers a callback that receives the smoothed audio frame and frame delta after each draw. */
   onFrame(listener: FrameListener): () => void {
     this.frameListeners.add(listener);
     return () => {
@@ -66,6 +67,8 @@ export class Visualizer {
     const next = SCENES[id as keyof typeof SCENES];
     if (!next || next === this.scene) return;
     this.scene = next;
+    document.body.classList.toggle('visualizer-calm', next.id === 'aurora');
+    if (next.id === 'aurora') this.pointerLayer.clear();
     next.enter?.();
   }
 
@@ -75,6 +78,7 @@ export class Visualizer {
     this.frameId = 0;
     this.unsubscribe();
     this.input.dispose();
+    document.body.classList.remove('visualizer-calm');
     this.frameListeners.clear();
     window.removeEventListener('resize', this.resize);
     document.removeEventListener('visibilitychange', this.onVisibility);
@@ -145,7 +149,7 @@ export class Visualizer {
     };
 
     this.scene.draw(context);
-    this.pointerLayer.draw({
+    if (this.scene.id !== 'aurora') this.pointerLayer.draw({
       ctx: this.ctx,
       width: this.width,
       height: this.height,
@@ -158,7 +162,7 @@ export class Visualizer {
       reducedMotion: this.reducedMotion,
     });
     this.input.endFrame();
-    for (const listener of this.frameListeners) listener(frame);
+    for (const listener of this.frameListeners) listener(frame, dt);
 
     this.frameId = window.requestAnimationFrame(this.draw);
   };

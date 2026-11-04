@@ -2,11 +2,13 @@ export const THEME_IDS = ['aurora', 'ember', 'forest', 'ocean', 'sunset', 'sakur
 export const MODE_IDS = ['system', 'dark', 'light'] as const;
 export const SCENE_IDS = ['bloom', 'spectrum', 'waveform', 'particles', 'rings', 'aurora', 'still'] as const;
 export const CURSOR_IDS = ['dot', 'ring', 'halo', 'native'] as const;
+export const CHARACTER_VIBES = ['auto', 'ambient', 'lofi', 'funk', 'pop', 'rock', 'classical', 'electronic'] as const;
 
 export type ThemeId = (typeof THEME_IDS)[number];
 export type ModeSetting = (typeof MODE_IDS)[number];
 export type SceneId = (typeof SCENE_IDS)[number];
 export type CursorStyle = (typeof CURSOR_IDS)[number];
+export type CharacterVibe = (typeof CHARACTER_VIBES)[number];
 
 export type Settings = {
   theme: ThemeId;
@@ -14,11 +16,13 @@ export type Settings = {
   scene: SceneId;
   /** Master multiplier applied to every audio-reactive scene. */
   reactivity: number;
-  /** Amount of soft spatial blending / travelling energy wave in Spectrum. */
+  /** Amount of spatial smoothing and traveling energy flow in Frequency Grid. */
   spectrumBlend: number;
-  /** Relative number of Spectrum bars, clamped to a performance-safe range. */
+  /** Relative number of Frequency Grid columns, clamped to a performance-safe range. */
   spectrumDensity: number;
   cursor: CursorStyle;
+  /** Automatic audio-energy movement profile or a user-selected musical movement preset. */
+  characterVibe: CharacterVibe;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -29,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   spectrumBlend: 0.58,
   spectrumDensity: 1,
   cursor: 'ring',
+  characterVibe: 'auto',
 };
 
 export const REACTIVITY_MIN = 0.5;
@@ -98,6 +103,7 @@ export function sanitize(input: Partial<Record<keyof Settings, unknown>>): Setti
     spectrumBlend: Math.round(Math.min(SPECTRUM_BLEND_MAX, Math.max(SPECTRUM_BLEND_MIN, rawBlend)) * 100) / 100,
     spectrumDensity: Math.round(Math.min(SPECTRUM_DENSITY_MAX, Math.max(SPECTRUM_DENSITY_MIN, rawDensity)) * 100) / 100,
     cursor: pick(input.cursor, CURSOR_IDS, DEFAULT_SETTINGS.cursor),
+    characterVibe: pick(input.characterVibe, CHARACTER_VIBES, DEFAULT_SETTINGS.characterVibe),
   };
 }
 

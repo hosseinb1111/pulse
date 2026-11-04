@@ -80,13 +80,47 @@
   }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 420px) {
   .volume-control {
-    width: 40%;
+    width: 54%;
+    gap: 5px;
+  }
+
+  .volume-icon {
+    display: none;
+  }
+
+  .volume-value {
+    min-width: 2.8em;
+    font-size: 0.64rem;
   }
 
   .timeline {
     gap: 8px;
+  }
+}
+
+@media (max-width: 360px) {
+  .bottom-controls {
+    gap: 8px;
+  }
+
+  .playlist-toggle {
+    gap: 6px;
+    padding-inline: 9px;
+    font-size: 0.8rem;
+  }
+
+  .volume-control {
+    width: 57%;
+  }
+
+  #character-vibe-options {
+    grid-template-columns: 1fr;
+  }
+
+  #character-vibe-options .choice {
+    min-height: 58px;
   }
 }
 

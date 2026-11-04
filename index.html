@@ -44,7 +44,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" /></svg>
             <span>Listen live</span>
           </button>
-          <button class="icon-button" id="settings-button" type="button" aria-label="Settings" title="Settings (appearance, background, cursor)" aria-expanded="false" aria-controls="settings-panel">
+          <button class="icon-button" id="settings-button" type="button" aria-label="Settings" title="Settings (themes, visualizer, character, cursor)" aria-expanded="false" aria-controls="settings-panel">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg>
           </button>
         </div>
@@ -54,7 +54,10 @@
         <section class="player" aria-label="Now playing">
           <div class="player-top">
             <div class="eyebrow"><span class="live-dot" aria-hidden="true"></span><span id="playing-status">READY WHEN YOU ARE</span></div>
-            <span class="scene-pill" id="scene-pill">Bloom</span>
+            <div class="player-top-meta">
+              <span class="scene-pill" id="scene-pill">Prism</span>
+              <span class="character-state-pill" id="character-state" aria-live="polite">AT REST</span>
+            </div>
           </div>
 
           <div class="mic-status" id="mic-status" role="status" aria-live="polite" hidden>
@@ -62,11 +65,12 @@
             <button class="text-button mic-retry" id="microphone-retry" type="button">Try again</button>
           </div>
 
-          <div class="artwork" aria-hidden="true">
+          <div class="artwork">
             <div class="artwork-card" id="artwork-card">
-              <span class="artwork-ring artwork-ring-one"></span>
-              <span class="artwork-ring artwork-ring-two"></span>
-              <span class="artwork-core">
+              <span class="artwork-ring artwork-ring-one" aria-hidden="true"></span>
+              <span class="artwork-ring artwork-ring-two" aria-hidden="true"></span>
+              <canvas class="character-canvas" id="character-canvas" tabindex="0" role="img" aria-label="Interactive full-body 3D anime character. Tap or click him to wave, move your pointer to guide his gaze, drag to rotate, or use the left and right arrow keys."></canvas>
+              <span class="artwork-core" aria-hidden="true">
                 <svg class="pulse-glyph" viewBox="0 0 64 64">
               <circle class="pulse-ring" cx="54" cy="34" r="7.2" />
               <path class="pulse-aura" d="M8 34H17.5L24 17L34.5 51L41.5 27L45 34" />
@@ -115,9 +119,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
               <span>Queue</span><span class="queue-count" id="queue-count">0</span>
             </button>
-            <div class="volume-control">
-              <svg class="volume-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4zM16 9a5 5 0 0 1 0 6M18.5 6.5a9 9 0 0 1 0 11" /></svg>
+            <div class="volume-control" role="group" aria-label="Volume control">
+              <svg class="volume-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4zM16 9a5 5 0 0 1 0 6" /></svg>
               <input id="volume-slider" class="range-slider volume-slider" type="range" min="0" max="1" value="0.75" step="0.01" aria-label="Volume" />
+              <output class="volume-value" id="volume-value" for="volume-slider" aria-live="off">75%</output>
             </div>
           </div>
         </section>
@@ -191,17 +196,19 @@
 
         <div class="drawer-body">
           <section class="settings-group">
-            <h3 class="group-title">Theme</h3>
+            <h3 class="group-title">Color atmosphere</h3>
+            <p class="group-description">Eight complete palettes, each carefully tuned for both light and dark mode.</p>
             <div class="choice-grid" id="theme-options"></div>
           </section>
 
           <section class="settings-group">
-            <h3 class="group-title">Light or dark</h3>
+            <h3 class="group-title">Interface mode</h3>
             <div class="segmented" id="mode-options"></div>
           </section>
 
           <section class="settings-group">
-            <h3 class="group-title">Background</h3>
+            <h3 class="group-title">Visualizer scene</h3>
+            <p class="group-description">Seven original audio-reactive environments. Choose the world that fits the way you listen.</p>
             <div class="choice-list" id="scene-options"></div>
           </section>
 
@@ -214,18 +221,24 @@
             <p class="hint">One control for the overall energy of every scene.</p>
           </section>
 
-          <section class="settings-group spectrum-settings-group">
-            <h3 class="group-title">Spectrum refinement</h3>
+          <section class="settings-group spectrum-settings-group" id="spectrum-settings-group">
+            <h3 class="group-title">Frequency Grid refinement</h3>
             <div class="range-setting">
-              <div class="range-setting-heading"><label for="spectrum-blend-slider">Energy wave blend</label><output id="spectrum-blend-value" for="spectrum-blend-slider">58%</output></div>
-              <input id="spectrum-blend-slider" class="range-slider" type="range" value="0.58" min="0" max="1" step="0.01" aria-label="Energy wave blending" />
-              <p class="hint">Softens frequency steps and adds a subtle travelling contour.</p>
+              <div class="range-setting-heading"><label for="spectrum-blend-slider">Field smoothing</label><output id="spectrum-blend-value" for="spectrum-blend-slider">58%</output></div>
+              <input id="spectrum-blend-slider" class="range-slider" type="range" value="0.58" min="0" max="1" step="0.01" aria-label="Frequency Grid field smoothing" />
+              <p class="hint">Smooths neighboring frequency columns and adds a subtle traveling flow.</p>
             </div>
             <div class="range-setting">
-              <div class="range-setting-heading"><label for="spectrum-density-slider">Bar density</label><output id="spectrum-density-value" for="spectrum-density-slider">100%</output></div>
-              <input id="spectrum-density-slider" class="range-slider" type="range" value="1" min="0.7" max="1.35" step="0.01" aria-label="Spectrum bar density" />
-              <p class="hint">Adjusts the number of rounded bars while keeping the renderer performance-bounded.</p>
+              <div class="range-setting-heading"><label for="spectrum-density-slider">Column density</label><output id="spectrum-density-value" for="spectrum-density-slider">100%</output></div>
+              <input id="spectrum-density-slider" class="range-slider" type="range" value="1" min="0.7" max="1.35" step="0.01" aria-label="Frequency Grid column density" />
+              <p class="hint">Adjusts the number of perspective columns while keeping the renderer performance-bounded.</p>
             </div>
+          </section>
+
+          <section class="settings-group">
+            <h3 class="group-title">Character movement</h3>
+            <div class="choice-list" id="character-vibe-options"></div>
+            <p class="hint">Auto follows audio energy and beat timing. Manual styles change his movement without claiming to identify the track's genre.</p>
           </section>
 
           <section class="settings-group">
@@ -240,6 +253,13 @@
       </aside>
 
       <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+    </div>
+
+    <div class="drop-overlay" id="drop-overlay" hidden aria-hidden="true">
+      <div class="drop-overlay-card">
+        <strong>Drop to add music</strong>
+        <span>MP3, WAV, FLAC, OGG, M4A, AAC</span>
+      </div>
     </div>
 
     <div class="cursor-ring" id="cursor" aria-hidden="true"></div>
