@@ -67,6 +67,8 @@ export class Visualizer {
     const next = SCENES[id as keyof typeof SCENES];
     if (!next || next === this.scene) return;
     this.scene = next;
+    // Reallocate the backing store only when changing the scene's pixel budget.
+    this.resize();
     document.body.classList.toggle('visualizer-calm', next.id === 'aurora');
     if (next.id === 'aurora') this.pointerLayer.clear();
     next.enter?.();
@@ -88,7 +90,9 @@ export class Visualizer {
     const rect = this.canvas.getBoundingClientRect();
     this.width = Math.max(1, rect.width || window.innerWidth);
     this.height = Math.max(1, rect.height || window.innerHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const deviceRatio = window.devicePixelRatio || 1;
+    const sceneCap = this.scene.id === 'spectrum' ? 1.2 : 1.5;
+    const dpr = Math.max(1, Math.min(deviceRatio, sceneCap));
     this.canvas.width = Math.round(this.width * dpr);
     this.canvas.height = Math.round(this.height * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

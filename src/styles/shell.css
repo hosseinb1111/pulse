@@ -41,10 +41,10 @@
 
 :root[data-mode="light"] .scrim {
   background:
-    radial-gradient(ellipse at 14% 14%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 54%),
-    radial-gradient(ellipse at 88% 82%, color-mix(in srgb, var(--accent-2) 7%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 38%, rgba(var(--shade-rgb), 0) 0%, rgba(var(--shade-rgb), 0.12) 75%),
-    linear-gradient(180deg, rgba(var(--shade-rgb), 0.015), rgba(var(--shade-rgb), 0.12));
+    radial-gradient(ellipse at 12% 10%, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 56%),
+    radial-gradient(ellipse at 90% 84%, color-mix(in srgb, var(--accent-2) 9%, transparent) 0%, transparent 52%),
+    radial-gradient(ellipse at 50% 44%, rgba(var(--shade-rgb), 0) 0%, rgba(var(--shade-rgb), 0.075) 78%),
+    linear-gradient(180deg, rgba(var(--shade-rgb), 0.005), rgba(var(--shade-rgb), 0.07));
 }
 
 .app-shell {

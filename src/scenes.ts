@@ -39,9 +39,11 @@ function wash(c: SceneContext, alpha = 1): void {
 
 function tone(c: SceneContext, hue: number, saturation = 82, lightness = 68, alpha = 1): string {
   const h = ((hue % 360) + 360) % 360;
-  const s = Math.min(100, Math.max(0, saturation * c.palette.chroma));
+  // Light canvases need richer pigment rather than the pale, low-contrast
+  // pastels that disappear against a bright app background.
+  const s = Math.min(100, Math.max(0, saturation * c.palette.chroma * (c.palette.isLight ? 1.08 : 1)));
   const l = c.palette.isLight
-    ? Math.min(72, Math.max(30, lightness * 0.58 + 18))
+    ? Math.min(78, Math.max(27, lightness * 0.7 + 4))
     : Math.min(90, Math.max(8, lightness));
   return `hsla(${h}, ${s}%, ${l}%, ${Math.min(1, Math.max(0, alpha))})`;
 }
@@ -187,6 +189,11 @@ const bloomScene: Scene = {
 
 
 // 2. FREQUENCY GRID — a perspective field of luminous sound architecture.
+// A compact lookup avoids repeatedly sampling/smoothing the same frequency band
+// for every depth layer. The drawing pass also uses flat fills instead of hundreds
+// of per-column CanvasGradient allocations.
+const spectrumValues = new Float32Array(64);
+const spectrumPeaks = new Float32Array(64);
 const spectrumScene: Scene = {
   id: 'spectrum',
   label: 'Frequency Grid',
@@ -194,139 +201,261 @@ const spectrumScene: Scene = {
   draw(c) {
     const { ctx, width: w, height: h, time: t, frame: f, hue } = c;
     const k = c.reducedMotion ? 0.52 : c.reactivity;
-    wash(c, 0.58);
-    const horizon = h * 0.34;
-    const cols = Math.max(34, Math.min(72, Math.round(48 * c.spectrumDensity)));
-    const rows = 13;
+    const cols = Math.max(30, Math.min(58, Math.round((w > 1500 ? 46 : 40) * c.spectrumDensity)));
+    const rows = 9;
     const blend = Math.min(1, Math.max(0, c.spectrumBlend));
+    const horizon = h * 0.32;
+    const min = Math.min(w, h);
 
-    drawGlow(c, w * 0.5, horizon + h * 0.08, Math.min(w, h) * 0.55, hue + 35, 0.12 + f.level * 0.12);
+    // A stronger wash in light mode prevents old geometry from accumulating as haze.
+    wash(c, c.palette.isLight ? 0.82 : 0.56);
+
+    // Sample and smooth each frequency only once per column, not once per depth.
+    for (let col = 0; col < cols; col += 1) {
+      const u = col / Math.max(1, cols - 1);
+      const band = sample(f.bands, u);
+      const before = sample(f.bands, Math.max(0, u - 1 / cols));
+      const after = sample(f.bands, Math.min(1, u + 1 / cols));
+      const filtered = (before + band * 2 + after) * 0.25;
+      const smoothed = band + (filtered - band) * blend;
+      const travelling = Math.sin(t * 0.92 - u * 8.5) * blend * 0.025;
+      spectrumValues[col] = Math.min(1, Math.max(0, (smoothed + travelling) * k));
+      spectrumPeaks[col] = f.peaks[Math.min(BAND_COUNT - 1, Math.floor(u * BAND_COUNT))] ?? 0;
+    }
+
+    // One restrained atmospheric source anchors the horizon without flooding the field.
+    drawGlow(c, w * 0.5, horizon + h * 0.09, min * 0.48, hue + 36, 0.13 + f.level * 0.12);
     ctx.globalCompositeOperation = composite(c);
 
-    // Perspective grid floor.
-    ctx.lineWidth = 0.7;
-    for (let row = 0; row <= 16; row += 1) {
-      const z = row / 16;
-      const y = horizon + Math.pow(z, 1.7) * h * 0.66;
-      ctx.beginPath();
-      ctx.moveTo(w * (0.5 - 0.54 * (0.23 + z * 0.77)), y);
-      ctx.lineTo(w * (0.5 + 0.54 * (0.23 + z * 0.77)), y);
-      ctx.strokeStyle = tone(c, hue + 130, 60, 66, 0.06 + z * 0.1);
-      ctx.stroke();
+    // Perspective floor: batch all floor lines into two strokes.
+    ctx.lineWidth = c.palette.isLight ? 0.85 : 0.7;
+    ctx.beginPath();
+    for (let row = 0; row <= 10; row += 1) {
+      const z = row / 10;
+      const y = horizon + Math.pow(z, 1.72) * h * 0.66;
+      const half = 0.54 * (0.2 + z * 0.8);
+      ctx.moveTo(w * (0.5 - half), y);
+      ctx.lineTo(w * (0.5 + half), y);
     }
-    for (let col = 0; col <= cols; col += 1) {
-      const u = col / cols - 0.5;
-      ctx.beginPath();
-      ctx.moveTo(w * (0.5 + u * 0.42), horizon);
-      ctx.lineTo(w * (0.5 + u * 1.12), h * 0.99);
-      ctx.strokeStyle = tone(c, hue + 175, 56, 68, 0.055);
-      ctx.stroke();
-    }
+    ctx.strokeStyle = tone(c, hue + 132, 62, 65, c.palette.isLight ? 0.16 : 0.095);
+    ctx.stroke();
 
-    // Back-to-front layers of columns create the illusion of a receding audio city.
+    ctx.beginPath();
+    const vanishingLines = Math.max(16, Math.round(cols * 0.58));
+    for (let line = 0; line <= vanishingLines; line += 1) {
+      const u = line / vanishingLines - 0.5;
+      ctx.moveTo(w * (0.5 + u * 0.43), horizon);
+      ctx.lineTo(w * (0.5 + u * 1.1), h * 0.99);
+    }
+    ctx.strokeStyle = tone(c, hue + 178, 58, 67, c.palette.isLight ? 0.12 : 0.065);
+    ctx.stroke();
+
+    // Back-to-front columns form a broad, legible sound city.
     for (let row = 0; row < rows; row += 1) {
       const depth = row / (rows - 1);
-      const scale = 0.24 + depth * 0.76;
-      const baseY = horizon + Math.pow(depth, 1.72) * h * 0.65;
-      const colPitch = (w * 0.94 * scale) / cols;
-      const barWidth = Math.max(1.2, colPitch * 0.66);
+      const scale = 0.22 + depth * 0.78;
+      const baseY = horizon + Math.pow(depth, 1.72) * h * 0.66;
+      const pitch = (w * 0.94 * scale) / cols;
+      const barWidth = Math.max(1.25, pitch * 0.68);
+      const depthFactor = 0.42 + depth * 0.58;
+      const alpha = (0.14 + depth * 0.24) * (c.palette.isLight ? 1.12 : 1);
+
       for (let col = 0; col < cols; col += 1) {
         const u = col / Math.max(1, cols - 1);
-        const band = sample(f.bands, u);
-        const before = sample(f.bands, Math.max(0, u - 1 / cols));
-        const after = sample(f.bands, Math.min(1, u + 1 / cols));
-        const filtered = (before + band * 2 + after) * 0.25;
-        const smoothed = band + (filtered - band) * blend;
-        const wave = Math.sin(t * 1.2 - u * 9 + depth * 4) * blend * 0.035;
-        const echo = smoothed * (0.64 + depth * 0.36) + wave;
-        const amplitude = Math.min(1, Math.max(0, echo * k));
-        const height = Math.max(1.8, (h * 0.025 + amplitude * h * 0.29) * (0.35 + depth * 0.65));
+        const amplitude = spectrumValues[col] ?? 0;
+        const peak = spectrumPeaks[col] ?? 0;
+        const shimmer = Math.sin(t * 0.72 + u * 10 - depth * 3) * 0.006;
+        const height = Math.max(1.6, (h * 0.018 + amplitude * h * 0.245 + shimmer * h) * depthFactor);
         const x = w * 0.5 + (u - 0.5) * w * 0.94 * scale - barWidth * 0.5;
         const top = baseY - height;
-        const shade = 0.14 + depth * 0.4 + amplitude * 0.34;
-        const colHue = hue + 180 - u * 150 + depth * 16;
+        const colHue = hue + 188 - u * 142 + depth * 12;
+        const bodyAlpha = Math.min(0.82, alpha + amplitude * 0.28);
 
-        const gradient = ctx.createLinearGradient(x, top, x, baseY);
-        gradient.addColorStop(0, tone(c, colHue + 20, 90, 82, shade + amplitude * 0.1));
-        gradient.addColorStop(0.26, tone(c, colHue, 86, 61, shade));
-        gradient.addColorStop(1, tone(c, colHue - 24, 84, 34, shade * 0.48));
-        ctx.fillStyle = gradient;
+        ctx.fillStyle = tone(c, colHue, 90, 62, bodyAlpha);
         ctx.fillRect(x, top, barWidth, height);
 
-        // Luminous top edge and tiny peak marker.
-        ctx.fillStyle = tone(c, colHue + 10, 82, 83, 0.14 + amplitude * 0.6);
-        ctx.fillRect(x, top, barWidth, Math.max(1, 1.4 * scale));
-        const peak = f.peaks[Math.min(BAND_COUNT - 1, Math.floor(u * BAND_COUNT))] ?? 0;
-        if (peak > 0.09 && depth > 0.42) {
-          const peakY = baseY - (h * 0.025 + peak * k * h * 0.29) * (0.35 + depth * 0.65);
-          ctx.fillStyle = tone(c, colHue + 28, 90, 88, 0.2 + peak * 0.5);
-          ctx.fillRect(x, peakY - 1.2, barWidth, 1.2);
+        // A narrow shaded side gives each column a little volume at almost no cost.
+        ctx.fillStyle = tone(c, colHue - 24, 88, 28, bodyAlpha * 0.68);
+        ctx.fillRect(x + barWidth * 0.72, top, Math.max(0.7, barWidth * 0.28), height);
+
+        // Bright caps and peak-hold markers make transients readable at a glance.
+        ctx.fillStyle = tone(c, colHue + 20, 92, 88, 0.3 + amplitude * 0.46 + depth * 0.08);
+        ctx.fillRect(x, top, barWidth * 0.76, Math.max(1.1, 1.5 * scale));
+        if (peak > 0.12 && depth > 0.48) {
+          const peakY = baseY - (h * 0.018 + peak * k * h * 0.245) * depthFactor;
+          ctx.fillStyle = tone(c, colHue + 32, 92, 90, 0.34 + peak * 0.42);
+          ctx.fillRect(x, peakY - 1.1, barWidth * 0.76, 1.1);
         }
       }
     }
 
-    // Horizon line provides a crisp visual anchor.
-    const horizonGradient = ctx.createLinearGradient(0, 0, w, 0);
-    horizonGradient.addColorStop(0, tone(c, hue + 30, 80, 65, 0));
-    horizonGradient.addColorStop(0.5, tone(c, hue + 190, 80, 80, 0.6));
-    horizonGradient.addColorStop(1, tone(c, hue + 330, 80, 65, 0));
+    // A crisp horizon separates the skyline from its perspective floor.
+    const horizonGradient = ctx.createLinearGradient(w * 0.1, 0, w * 0.9, 0);
+    horizonGradient.addColorStop(0, tone(c, hue + 28, 82, 62, 0));
+    horizonGradient.addColorStop(0.5, tone(c, hue + 190, 86, 80, c.palette.isLight ? 0.76 : 0.58));
+    horizonGradient.addColorStop(1, tone(c, hue + 330, 82, 62, 0));
     ctx.beginPath();
-    ctx.moveTo(w * 0.12, horizon);
-    ctx.lineTo(w * 0.88, horizon);
+    ctx.moveTo(w * 0.1, horizon);
+    ctx.lineTo(w * 0.9, horizon);
     ctx.strokeStyle = horizonGradient;
-    ctx.lineWidth = 1.25 + energy(c, f.beat) * 2;
+    ctx.lineWidth = 1.2 + energy(c, f.beat) * 1.8;
     ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
   },
 };
 
-// 3. SOFT HALO — one quiet, breathing light with a restrained bass response.
+// 3. SOFT HALO — a complete orbital instrument around one luminous sound core.
+interface HaloDust {
+  angle: number;
+  distance: number;
+  size: number;
+  phase: number;
+  depth: number;
+}
+const haloDust: HaloDust[] = Array.from({ length: 76 }, (_, i) => ({
+  angle: seeded(i, 31) * TAU,
+  distance: 1.95 + seeded(i, 32) * 1.45,
+  size: 0.45 + seeded(i, 33) * 1.45,
+  phase: seeded(i, 34) * TAU,
+  depth: 0.35 + seeded(i, 35) * 0.65,
+}));
+
 const waveformScene: Scene = {
   id: 'waveform',
   label: 'Soft Halo',
-  description: 'A single luminous halo that breathes gently with the music.',
+  description: 'A luminous orbital sound instrument with a living spectral crown.',
   draw(c) {
     const { ctx, width: w, height: h, time: t, frame: f, hue } = c;
     const min = Math.min(w, h);
     const bass = energy(c, f.bass);
     const beat = energy(c, f.beat);
-    const breath = 0.5 + Math.sin(t * 0.34) * 0.5;
-    const cx = w * (0.5 + c.pointer.nx * 0.012);
-    const cy = h * (0.49 + c.pointer.ny * 0.012);
-    const radius = min * (0.12 + breath * 0.009 + bass * 0.025 + beat * 0.012);
-    const outer = radius * 3.15;
+    const treble = energy(c, f.treble);
+    const breath = 0.5 + Math.sin(t * 0.42) * 0.5;
+    const cx = w * (0.5 + c.pointer.nx * 0.014);
+    const cy = h * (0.48 + c.pointer.ny * 0.014);
+    const radius = min * (0.105 + breath * 0.012 + bass * 0.026 + beat * 0.015);
+    const outer = radius * 3.7;
 
-    // Near-opaque wash avoids trails and keeps the visual intentionally clean.
-    wash(c, 0.94);
+    wash(c, c.palette.isLight ? 0.91 : 0.84);
 
-    const atmosphere = ctx.createRadialGradient(cx, cy, radius * 0.12, cx, cy, outer);
-    atmosphere.addColorStop(0, tone(c, hue + 18, 64, 74, 0.19 + bass * 0.09));
-    atmosphere.addColorStop(0.28, tone(c, hue + 64, 58, 54, 0.10 + beat * 0.06));
-    atmosphere.addColorStop(0.68, tone(c, hue + 120, 52, 38, 0.035));
-    atmosphere.addColorStop(1, tone(c, hue + 160, 45, 26, 0));
+    // Layered atmosphere establishes depth before the orbital geometry appears.
+    const atmosphere = ctx.createRadialGradient(cx, cy, radius * 0.22, cx, cy, outer);
+    atmosphere.addColorStop(0, tone(c, hue + 20, 74, 75, 0.19 + bass * 0.12));
+    atmosphere.addColorStop(0.28, tone(c, hue + 76, 72, 58, 0.12 + beat * 0.08));
+    atmosphere.addColorStop(0.62, tone(c, hue + 142, 62, 40, 0.045));
+    atmosphere.addColorStop(1, tone(c, hue + 178, 54, 30, 0));
     ctx.globalCompositeOperation = composite(c);
     ctx.fillStyle = atmosphere;
     ctx.fillRect(cx - outer, cy - outer, outer * 2, outer * 2);
 
-    // A single soft disc gives the centre a little definition without visual clutter.
-    const core = ctx.createRadialGradient(
-      cx - radius * 0.22, cy - radius * 0.28, radius * 0.02,
-      cx, cy, radius,
-    );
-    core.addColorStop(0, tone(c, hue + 28, 42, 96, 0.22 + bass * 0.12));
-    core.addColorStop(0.42, tone(c, hue + 6, 66, 78, 0.12 + beat * 0.08));
-    core.addColorStop(1, tone(c, hue + 80, 62, 55, 0));
+    // Three orbital ellipses: a soft outer track, a precise middle rail and a tilted inner ring.
+    const orbitSpecs = [
+      { rx: 2.72, ry: 1.16, rotation: -0.13, alpha: 0.13, width: 1 },
+      { rx: 2.28, ry: 0.74, rotation: 0.2, alpha: 0.2, width: 1.15 },
+      { rx: 1.62, ry: 0.56, rotation: -0.31, alpha: 0.22, width: 0.85 },
+    ];
+    for (let i = 0; i < orbitSpecs.length; i += 1) {
+      const orbit = orbitSpecs[i];
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, radius * orbit.rx, radius * orbit.ry, orbit.rotation, 0, TAU);
+      ctx.strokeStyle = tone(c, hue + 48 + i * 38, 76, 75, orbit.alpha + bass * (i === 1 ? 0.09 : 0.035));
+      ctx.lineWidth = orbit.width + beat * (i === 1 ? 1.2 : 0.35);
+      ctx.stroke();
+    }
+
+    // Radial spectrum crown. One batched path replaces dozens of individual strokes.
+    const spokes = 72;
+    ctx.beginPath();
+    const innerRadius = radius * 1.35;
+    for (let i = 0; i < spokes; i += 1) {
+      const u = i / spokes;
+      const angle = u * TAU - Math.PI / 2;
+      const level = energy(c, sample(f.bands, u) * 0.82 + f.mid * 0.12 + f.treble * 0.08);
+      const flutter = Math.sin(t * 0.8 + i * 0.19) * 0.018;
+      const length = radius * (0.09 + level * 0.72 + treble * 0.04 + flutter);
+      const x1 = cx + Math.cos(angle) * innerRadius;
+      const y1 = cy + Math.sin(angle) * innerRadius;
+      const x2 = cx + Math.cos(angle) * (innerRadius + length);
+      const y2 = cy + Math.sin(angle) * (innerRadius + length);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+    }
+    const crownGradient = ctx.createLinearGradient(cx - radius * 2.2, cy - radius * 2.2, cx + radius * 2.2, cy + radius * 2.2);
+    crownGradient.addColorStop(0, tone(c, hue + 176, 80, 66, 0.58));
+    crownGradient.addColorStop(0.5, tone(c, hue + 24, 88, 76, 0.82));
+    crownGradient.addColorStop(1, tone(c, hue + 112, 82, 62, 0.58));
+    ctx.strokeStyle = crownGradient;
+    ctx.lineWidth = c.palette.isLight ? 1.45 : 1.2;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // Fine radial index marks give the halo the feel of a tuned instrument.
+    ctx.beginPath();
+    for (let i = 0; i < 48; i += 1) {
+      const angle = (i / 48) * TAU - Math.PI / 2;
+      const inner = radius * 1.15;
+      const length = i % 4 === 0 ? radius * 0.14 : radius * 0.075;
+      ctx.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner);
+      ctx.lineTo(cx + Math.cos(angle) * (inner + length), cy + Math.sin(angle) * (inner + length));
+    }
+    ctx.strokeStyle = tone(c, hue + 34, 62, 73, 0.34 + bass * 0.18);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // A luminous, glass-like core with a bright centre and a defined outer edge.
+    const core = ctx.createRadialGradient(cx - radius * 0.28, cy - radius * 0.34, radius * 0.025, cx, cy, radius);
+    core.addColorStop(0, tone(c, hue + 30, 58, 98, 0.94));
+    core.addColorStop(0.22, tone(c, hue + 18, 76, 86, 0.72 + bass * 0.12));
+    core.addColorStop(0.58, tone(c, hue + 68, 72, 61, 0.43 + beat * 0.12));
+    core.addColorStop(1, tone(c, hue + 112, 72, 48, 0.08));
     ctx.fillStyle = core;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, TAU);
     ctx.fill();
-
-    // One fine elliptical rim, nearly still when the track is quiet.
     ctx.beginPath();
-    ctx.ellipse(cx, cy, radius * (1.72 + bass * 0.08), radius * (0.68 + bass * 0.035), -0.12, 0, TAU);
-    ctx.strokeStyle = tone(c, hue + 52, 54, 82, 0.13 + bass * 0.12 + beat * 0.08);
-    ctx.lineWidth = 0.9 + beat * 0.75;
+    ctx.arc(cx, cy, radius * (0.34 + bass * 0.06), 0, TAU);
+    ctx.strokeStyle = tone(c, hue + 16, 74, 91, 0.34 + beat * 0.28);
+    ctx.lineWidth = 1 + beat * 1.4;
     ctx.stroke();
+
+    // Two satellites travel on separate rails, with a compact bloom at each node.
+    for (let i = 0; i < 2; i += 1) {
+      const angle = t * (i === 0 ? 0.2 : -0.145) + (i === 0 ? 0.65 : 3.15);
+      const orbitX = radius * (i === 0 ? 2.28 : 1.62);
+      const orbitY = radius * (i === 0 ? 0.74 : 0.56);
+      const sx = cx + Math.cos(angle) * orbitX;
+      const sy = cy + Math.sin(angle) * orbitY;
+      const satellite = radius * (0.042 + (i === 0 ? bass : treble) * 0.045);
+      drawGlow(c, sx, sy, satellite * 4, hue + (i === 0 ? 30 : 166), 0.36 + (i === 0 ? bass : treble) * 0.32);
+      ctx.beginPath();
+      ctx.arc(sx, sy, satellite, 0, TAU);
+      ctx.fillStyle = tone(c, hue + (i === 0 ? 24 : 164), 86, 82, 0.78);
+      ctx.fill();
+    }
+
+    // Sparse orbital dust makes the field feel inhabited without becoming noisy.
+    for (const mote of haloDust) {
+      const angle = mote.angle + t * (0.018 + mote.depth * 0.025);
+      const distance = radius * mote.distance;
+      const x = cx + Math.cos(angle) * distance * 1.42;
+      const y = cy + Math.sin(angle) * distance * 0.62;
+      const twinkle = 0.28 + (Math.sin(t * 0.55 + mote.phase) + 1) * 0.22;
+      ctx.fillStyle = tone(c, hue + mote.depth * 90, 64, 72, twinkle * mote.depth);
+      ctx.fillRect(x, y, mote.size, mote.size);
+    }
+
+    // Quiet travelling ripples respond to the beat and remain visible during silence.
+    for (let i = 0; i < 2; i += 1) {
+      const phase = (t * 0.105 + i * 0.5) % 1;
+      const rippleRadius = radius * (2.35 + phase * 1.7 + beat * 0.12);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rippleRadius * 1.18, rippleRadius * 0.62, -0.12, 0, TAU);
+      ctx.strokeStyle = tone(c, hue + 68 + i * 38, 70, 74, (1 - phase) * (0.1 + bass * 0.12));
+      ctx.lineWidth = 0.8 + beat * 0.75;
+      ctx.stroke();
+    }
+
     ctx.globalCompositeOperation = 'source-over';
   },
 };
@@ -621,81 +750,174 @@ const calmScene: Scene = {
   },
 };
 
-// 7. MOONLIGHT — a deliberate, cinematic visual for quieter listening.
+// 7. MOONLIGHT — a cinematic eclipse with orbital structure and a living star field.
+interface MoonStar {
+  x: number;
+  y: number;
+  size: number;
+  phase: number;
+  depth: number;
+}
+const moonStars: MoonStar[] = Array.from({ length: 176 }, (_, i) => ({
+  x: 0.025 + seeded(i, 41) * 0.95,
+  y: 0.035 + seeded(i, 42) * 0.92,
+  size: 0.45 + seeded(i, 43) * (seeded(i, 44) > 0.93 ? 2.1 : 1.05),
+  phase: seeded(i, 45) * TAU,
+  depth: 0.25 + seeded(i, 46) * 0.75,
+}));
+
 const moonScene: Scene = {
   id: 'still',
   label: 'Moonlight',
-  description: 'A quiet eclipse, drifting orbital dust and a restrained pulse of light.',
+  description: 'A cinematic lunar eclipse, orbital dust and a restrained pulse of light.',
   draw(c) {
     const { ctx, width: w, height: h, time: t, frame: f, hue } = c;
-    const k = c.reducedMotion ? 0.24 : c.reactivity * 0.34;
-    wash(c, 1);
+    const k = c.reducedMotion ? 0.32 : c.reactivity * 0.55;
     const min = Math.min(w, h);
-    const cx = w * (0.5 + Math.sin(t * 0.07) * 0.025 + c.pointer.nx * 0.035);
-    const cy = h * (0.44 + Math.cos(t * 0.08) * 0.025 + c.pointer.ny * 0.025);
-    const radius = min * (0.22 + f.level * k * 0.025 + f.beat * k * 0.02);
+    const bass = energy(c, f.bass);
+    const beat = energy(c, f.beat);
+    const cx = w * (0.51 + Math.sin(t * 0.065) * 0.022 + c.pointer.nx * 0.026);
+    const cy = h * (0.445 + Math.cos(t * 0.075) * 0.02 + c.pointer.ny * 0.02);
+    const radius = min * (0.195 + f.level * k * 0.014 + beat * 0.012);
 
-    // A barely visible atmospheric gradient gives the scene a cinematic depth.
-    drawGlow(c, cx, cy, min * 0.76, hue + 30, 0.14 + f.level * k * 0.08);
+    wash(c, c.palette.isLight ? 0.96 : 1);
+
+    // Broad, quiet nebula light gives the scene a horizon and a sense of scale.
+    drawGlow(c, cx, cy, min * 0.82, hue + 36, c.palette.isLight ? 0.19 : 0.15);
+    const haze = ctx.createRadialGradient(cx, cy + radius * 0.4, radius * 0.15, cx, cy, min * 0.78);
+    haze.addColorStop(0, tone(c, hue + 150, 55, 62, 0.075 + f.level * 0.035));
+    haze.addColorStop(0.55, tone(c, hue + 205, 48, 48, 0.035));
+    haze.addColorStop(1, tone(c, hue + 230, 42, 36, 0));
     ctx.globalCompositeOperation = composite(c);
+    ctx.fillStyle = haze;
+    ctx.fillRect(cx - min * 0.82, cy - min * 0.82, min * 1.64, min * 1.64);
 
-    // Long, elliptical orbital lines.
-    for (let i = 0; i < 5; i += 1) {
+    // Distant stars are deterministic, so no objects are allocated during the frame loop.
+    for (const star of moonStars) {
+      const twinkle = 0.28 + (Math.sin(t * (0.22 + star.depth * 0.22) + star.phase) + 1) * 0.28;
+      const alpha = twinkle * star.depth * (0.78 + f.treble * 0.12);
+      const x = star.x * w + Math.sin(t * 0.012 + star.phase) * star.depth * 4;
+      const y = star.y * h + Math.cos(t * 0.01 + star.phase) * star.depth * 3;
+      ctx.fillStyle = tone(c, hue + 176 + star.depth * 42, 42, c.palette.isLight ? 32 : 86, alpha * (c.palette.isLight ? 0.62 : 0.82));
+      ctx.fillRect(x, y, star.size, star.size);
+      if (star.size > 1.8) {
+        ctx.beginPath();
+        ctx.moveTo(x - star.size * 2.1, y + star.size * 0.5);
+        ctx.lineTo(x + star.size * 3.1, y + star.size * 0.5);
+        ctx.moveTo(x + star.size * 0.5, y - star.size * 2.1);
+        ctx.lineTo(x + star.size * 0.5, y + star.size * 3.1);
+        ctx.strokeStyle = tone(c, hue + 190, 46, c.palette.isLight ? 30 : 88, alpha * 0.26);
+        ctx.lineWidth = 0.55;
+        ctx.stroke();
+      }
+    }
+
+    // Elliptical orbital tracks cross behind the body at different inclinations.
+    const orbitRadii = [1.62, 2.05, 2.52, 3.05];
+    for (let i = 0; i < orbitRadii.length; i += 1) {
+      const scale = orbitRadii[i];
       ctx.beginPath();
-      ctx.ellipse(cx, cy, radius * (1.7 + i * 0.52), radius * (0.48 + i * 0.13), -0.15 + i * 0.075, 0, TAU);
-      ctx.strokeStyle = tone(c, hue + 42 + i * 26, 44, 74, 0.07 + (i === 1 ? f.level * 0.08 : 0));
-      ctx.lineWidth = 0.8;
+      ctx.ellipse(cx, cy, radius * scale, radius * (0.46 + i * 0.105), -0.2 + i * 0.085, 0, TAU);
+      ctx.strokeStyle = tone(c, hue + 42 + i * 34, 54, c.palette.isLight ? 42 : 76, 0.105 + (i === 1 ? f.level * 0.045 : 0));
+      ctx.lineWidth = i === 1 ? 1.15 : 0.75;
       ctx.stroke();
     }
 
-    // Moon body: a layered, softly lit disc with a clean eclipsed edge.
-    const lunar = ctx.createRadialGradient(cx - radius * 0.34, cy - radius * 0.38, radius * 0.03, cx, cy, radius * 1.12);
-    lunar.addColorStop(0, tone(c, hue + 32, 26, 94, 0.96));
-    lunar.addColorStop(0.32, tone(c, hue + 18, 38, 78, 0.94));
-    lunar.addColorStop(0.72, tone(c, hue + 72, 48, 43, 0.9));
-    lunar.addColorStop(1, tone(c, hue + 120, 54, 20, 0.75));
+    // The eclipse body is a dark, dimensional sphere so it remains legible in light mode too.
+    const lunar = ctx.createRadialGradient(cx - radius * 0.34, cy - radius * 0.42, radius * 0.025, cx, cy, radius * 1.08);
+    lunar.addColorStop(0, tone(c, hue + 212, 34, 25, 0.99));
+    lunar.addColorStop(0.42, tone(c, hue + 224, 48, 19, 0.99));
+    lunar.addColorStop(0.78, tone(c, hue + 188, 56, 13, 0.99));
+    lunar.addColorStop(1, tone(c, hue + 170, 62, 9, 0.99));
     ctx.fillStyle = lunar;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, TAU);
     ctx.fill();
 
-    // A dark mask creates the eclipse crescent; its offset is subtly audio-reactive.
-    const maskGradient = ctx.createRadialGradient(cx + radius * (0.46 + f.bass * k * 0.1), cy - radius * 0.1, radius * 0.06, cx + radius * 0.44, cy, radius * 1.04);
-    maskGradient.addColorStop(0, `rgba(${c.palette.shadeRgb}, 0.96)`);
-    maskGradient.addColorStop(0.72, `rgba(${c.palette.shadeRgb}, 0.88)`);
-    maskGradient.addColorStop(1, `rgba(${c.palette.shadeRgb}, 0)`);
-    ctx.fillStyle = maskGradient;
+    // Low-contrast lunar terrain adds detail without competing with the crescent.
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(cx + radius * (0.38 + f.bass * k * 0.08), cy - radius * 0.06, radius * 0.98, 0, TAU);
-    ctx.fill();
-
-    // The illuminated rim blooms on a bass hit.
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius * (1.02 + f.beat * k * 0.035), -Math.PI * 0.78, Math.PI * 0.73);
-    ctx.strokeStyle = tone(c, hue + 48, 62, 86, 0.28 + f.bass * k * 0.24 + f.beat * k * 0.28);
-    ctx.lineWidth = 1.2 + f.beat * k * 1.8;
-    ctx.stroke();
-
-    // Sparse dust points; slower and quieter than the other scenes by design.
-    for (let i = 0; i < 88; i += 1) {
-      const angle = seeded(i, 9) * TAU + t * (0.008 + seeded(i, 10) * 0.015);
-      const distance = min * (0.14 + seeded(i, 11) * 0.52);
-      const x = cx + Math.cos(angle) * distance * (w / min);
-      const y = cy + Math.sin(angle) * distance;
-      const twinkle = 0.22 + (Math.sin(t * 0.35 + seeded(i, 12) * TAU) + 1) * 0.18;
-      const size = 0.45 + seeded(i, 13) * 1.2;
-      ctx.fillStyle = tone(c, hue + seeded(i, 14) * 80, 48, 82, twinkle + f.treble * 0.06);
+    ctx.arc(cx, cy, radius * 0.985, 0, TAU);
+    ctx.clip();
+    for (let i = 0; i < 10; i += 1) {
+      const ox = (seeded(i, 51) - 0.5) * radius * 1.2;
+      const oy = (seeded(i, 52) - 0.5) * radius * 1.2;
+      if (ox * ox + oy * oy > radius * radius * 0.53) continue;
+      const crater = radius * (0.035 + seeded(i, 53) * 0.085);
       ctx.beginPath();
-      ctx.arc(x, y, size, 0, TAU);
+      ctx.arc(cx + ox, cy + oy, crater, 0, TAU);
+      ctx.strokeStyle = tone(c, hue + 190, 26, 68, 0.12);
+      ctx.lineWidth = Math.max(0.65, crater * 0.12);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx + ox - crater * 0.18, cy + oy - crater * 0.18, crater * 0.72, 0, TAU);
+      ctx.fillStyle = tone(c, hue + 208, 38, 14, 0.12);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // A curved, illuminated crescent cuts across the dark lunar disc.
+    const crescent = ctx.createLinearGradient(cx - radius, cy - radius, cx + radius, cy + radius);
+    crescent.addColorStop(0, tone(c, hue + 38, 58, 94, 0.98));
+    crescent.addColorStop(0.42, tone(c, hue + 64, 68, 82, 0.92));
+    crescent.addColorStop(1, tone(c, hue + 126, 70, 58, 0.58));
+    ctx.save();
+    ctx.shadowColor = tone(c, hue + 62, 84, 82, 0.62);
+    ctx.shadowBlur = radius * (0.16 + bass * 0.11);
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * (0.97 + beat * 0.012), -Math.PI * 0.76, Math.PI * 0.72);
+    ctx.strokeStyle = crescent;
+    ctx.lineWidth = radius * (0.085 + bass * 0.018 + beat * 0.025);
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+    ctx.lineCap = 'butt';
+
+    // A finer rim and two travelling shock rings make the eclipse pulse on bass hits.
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 1.045, -Math.PI * 0.78, Math.PI * 0.74);
+    ctx.strokeStyle = tone(c, hue + 50, 68, 90, 0.36 + bass * 0.3 + beat * 0.22);
+    ctx.lineWidth = 0.8 + beat * 1.4;
+    ctx.stroke();
+    for (let i = 0; i < 2; i += 1) {
+      const phase = (t * 0.085 + i * 0.5) % 1;
+      const ripple = radius * (1.3 + phase * 2.2);
+      ctx.beginPath();
+      ctx.arc(cx, cy, ripple, -Math.PI * 0.86, Math.PI * 0.84);
+      ctx.strokeStyle = tone(c, hue + 72 + i * 28, 54, 78, (1 - phase) * (0.12 + bass * 0.12));
+      ctx.lineWidth = 0.75 + beat * 0.45;
+      ctx.stroke();
+    }
+
+    // Three orbiting bodies give the orbital paths a clear purpose and scale.
+    const satellites = [
+      { orbit: 2.05, speed: 0.11, phase: 0.7, size: 0.023, hue: 44 },
+      { orbit: 2.52, speed: -0.075, phase: 2.8, size: 0.014, hue: 178 },
+      { orbit: 3.05, speed: 0.052, phase: 4.4, size: 0.011, hue: 108 },
+    ];
+    for (const satellite of satellites) {
+      const angle = t * satellite.speed + satellite.phase;
+      const sx = cx + Math.cos(angle) * radius * satellite.orbit;
+      const sy = cy + Math.sin(angle) * radius * (0.46 + (satellite.orbit - 1.62) * 0.105);
+      const sr = radius * (satellite.size + (satellite.orbit === 2.05 ? bass * 0.008 : 0));
+      drawGlow(c, sx, sy, sr * 5, hue + satellite.hue, 0.26 + bass * 0.18);
+      ctx.beginPath();
+      ctx.arc(sx, sy, sr, 0, TAU);
+      ctx.fillStyle = tone(c, hue + satellite.hue, 68, 84, 0.86);
       ctx.fill();
     }
 
-    // A soft, slow halo remains visible even with no signal.
+    // A thin lower atmospheric arc keeps the planet grounded in the larger scene.
+    const lowerAtmosphere = ctx.createLinearGradient(cx - radius * 2.8, cy + radius * 2.4, cx + radius * 2.8, cy + radius * 2.4);
+    lowerAtmosphere.addColorStop(0, tone(c, hue + 28, 66, 68, 0));
+    lowerAtmosphere.addColorStop(0.5, tone(c, hue + 172, 64, 76, 0.18 + f.level * 0.1));
+    lowerAtmosphere.addColorStop(1, tone(c, hue + 320, 66, 68, 0));
     ctx.beginPath();
-    ctx.arc(cx, cy, radius * (1.52 + f.pulse * k * 0.1), 0, TAU);
-    ctx.strokeStyle = tone(c, hue + 90, 44, 72, 0.06 + f.level * k * 0.07);
-    ctx.lineWidth = 1;
+    ctx.ellipse(cx, cy + radius * 2.52, radius * 2.8, radius * 0.38, -0.03, 0, TAU);
+    ctx.strokeStyle = lowerAtmosphere;
+    ctx.lineWidth = 1.1;
     ctx.stroke();
+
     ctx.globalCompositeOperation = 'source-over';
   },
 };
