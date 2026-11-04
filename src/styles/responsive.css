@@ -96,7 +96,22 @@
   }
 
   .timeline {
-    gap: 8px;
+    gap: 7px;
+  }
+
+  .seek-control-row {
+    grid-template-columns: 29px minmax(0, 1fr) 29px;
+    gap: 4px;
+  }
+
+  .seek-jump {
+    width: 29px;
+    height: 29px;
+  }
+
+  .seek-jump svg {
+    width: 25px;
+    height: 25px;
   }
 }
 
