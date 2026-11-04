@@ -1,4 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
 import { AudioEngine, probeDuration, type AudioSnapshot } from './audio';
@@ -10,6 +11,7 @@ import { SettingsPanel } from './settings-panel';
 import { SCENES } from './scenes';
 import { SCENE_IDS, THEME_IDS, settings, type ModeSetting } from './settings';
 import { THEMES, applyAppearance, currentPalette } from './themes';
+import type { CharacterExperience } from './character/experience';
 import './styles/index.css';
 
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac'] as const;
@@ -36,6 +38,7 @@ const elements = {
   totalTime: requiredElement<HTMLElement>('total-time'),
   seekSlider: requiredElement<HTMLInputElement>('seek-slider'),
   volumeSlider: requiredElement<HTMLInputElement>('volume-slider'),
+  volumeValue: requiredElement<HTMLOutputElement>('volume-value'),
   playButton: requiredElement<HTMLButtonElement>('play-button'),
   previousButton: requiredElement<HTMLButtonElement>('previous-button'),
   nextButton: requiredElement<HTMLButtonElement>('next-button'),
@@ -44,8 +47,11 @@ const elements = {
   repeatOneIndicator: requiredElement<HTMLElement>('repeat-one-indicator'),
   clearPlaylist: requiredElement<HTMLButtonElement>('clear-playlist-button'),
   toastRegion: requiredElement<HTMLElement>('toast-region'),
+  dropOverlay: requiredElement<HTMLElement>('drop-overlay'),
   canvas: requiredElement<HTMLCanvasElement>('visualizer-canvas'),
   artwork: requiredElement<HTMLElement>('artwork-card'),
+  characterCanvas: requiredElement<HTMLCanvasElement>('character-canvas'),
+  characterState: requiredElement<HTMLElement>('character-state'),
   scenePill: requiredElement<HTMLElement>('scene-pill'),
   playlistToggle: requiredElement<HTMLButtonElement>('playlist-toggle'),
   microphoneButton: requiredElement<HTMLButtonElement>('microphone-button'),
@@ -59,17 +65,37 @@ applyAppearance();
 initCursor();
 const audio = new AudioEngine(loadVolume());
 const visualizer = new Visualizer(elements.canvas, audio.analyser);
+let character: CharacterExperience | null = null;
+let applicationLeaving = false;
+// Load Three.js and the 3D scene separately so a blocked CDN/WebGL device still gets the full player.
+void import('./character/experience')
+  .then(({ createCharacterExperience }) => {
+    if (applicationLeaving) return null;
+    return createCharacterExperience(elements.characterCanvas, elements.characterState);
+  })
+  .then((instance) => {
+    if (!instance) return;
+    if (applicationLeaving) instance.dispose();
+    else character = instance;
+  })
+  .catch((error: unknown) => {
+    console.warn('The 3D character could not be initialized; the music player will continue normally.', error);
+    if (!applicationLeaving) elements.characterState.textContent = 'PORTRAIT UNAVAILABLE';
+  });
 // Drive the artwork's rings and glow from the audio, so the cover reacts even without the canvas.
 const brandMark = document.querySelector<HTMLElement>('.brand-mark');
 const faviconLink = document.querySelector<HTMLLinkElement>('link[rel="icon"][type="image/svg+xml"]');
 let lastFaviconUpdate = -1000;
 let lastFaviconLevel = -1;
-visualizer.onFrame((frame) => {
+visualizer.onFrame((frame, dt) => {
   const beat = frame.beat.toFixed(3);
   const bass = frame.bass.toFixed(3);
   elements.artwork.style.setProperty('--level', frame.level.toFixed(3));
   elements.artwork.style.setProperty('--beat', beat);
   elements.artwork.style.setProperty('--bass', bass);
+  const snapshot = audio.getSnapshot();
+  const sourceActive = microphoneActive || (!snapshot.paused && currentTrackId !== null);
+  character?.update(frame, dt, sourceActive);
   // The top-bar mark uses the same bass envelope as the main artwork.
   brandMark?.style.setProperty('--beat', beat);
   brandMark?.style.setProperty('--bass', bass);
@@ -105,7 +131,7 @@ const previousSession = loadLastPlayback();
 let restorationAttemptedFor: string | null = null;
 const playlist = new PlaylistView((trackId) => {
   void playTrack(trackId, true);
-});
+}, (orderedIds) => reorderTracks(orderedIds));
 
 const settingsPanel = new SettingsPanel((open) => {
   if (open) playlist.setOpen(false);
@@ -121,7 +147,7 @@ settings.subscribe(() => {
 renderScenePill();
 
 audio.setVolume(loadVolume());
-elements.volumeSlider.value = String(audio.getSnapshot().volume);
+renderVolume(audio.getSnapshot().volume);
 
 const initialSnapshot = audio.getSnapshot();
 renderAudioState(initialSnapshot);
@@ -174,11 +200,10 @@ elements.nextButton.addEventListener('click', () => void playNext(true));
 elements.shuffleButton.addEventListener('click', toggleShuffle);
 elements.repeatButton.addEventListener('click', cycleRepeatMode);
 elements.clearPlaylist.addEventListener('click', clearPlaylist);
+initFileDrop();
 
 elements.volumeSlider.addEventListener('input', () => {
-  const volume = Number(elements.volumeSlider.value);
-  audio.setVolume(volume);
-  saveVolume(volume);
+  setVolume(Number(elements.volumeSlider.value));
 });
 
 elements.seekSlider.addEventListener('pointerdown', () => {
@@ -243,6 +268,9 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 });
 
 window.addEventListener('beforeunload', () => {
+  applicationLeaving = true;
+  character?.dispose();
+  character = null;
   persistPlaybackPosition(audio.getSnapshot(), true);
   audio.dispose();
   visualizer.dispose();
@@ -270,41 +298,111 @@ async function importAudioFiles(): Promise<void> {
     if (!selection) return;
 
     const paths = (Array.isArray(selection) ? selection : [selection]).filter((path): path is string => typeof path === 'string');
-    if (paths.length === 0) return;
-
-    showToast(`Loading ${paths.length} ${paths.length === 1 ? 'file' : 'files'}…`, 'info');
-    const loaded: File[] = [];
-    const errors: string[] = [];
-
-    // Keep the imported list useful even if one selected file is corrupt or inaccessible.
-    for (let index = 0; index < paths.length; index += 1) {
-      const path = paths[index];
-      if (!path) continue;
-      try {
-        const bytes = await readFile(path);
-        if (bytes.byteLength === 0) throw new Error('The file is empty.');
-        const extension = extensionFromPath(path) ?? detectAudioExtension(bytes);
-        if (!extension) throw new Error('The file does not appear to be a supported audio format.');
-        const suggestedName = filenameFromPath(path);
-        const hasUsefulFilename = suggestedName && hasAudioExtension(suggestedName);
-        const name = hasUsefulFilename ? suggestedName : `Track ${tracks.length + loaded.length + 1}.${extension}`;
-        const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-        loaded.push(new File([arrayBuffer], name, { type: MIME_BY_EXTENSION[extension] ?? 'application/octet-stream' }));
-      } catch (error: unknown) {
-        const shortName = filenameFromPath(path) || `Selected file ${index + 1}`;
-        errors.push(`${shortName}: ${error instanceof Error ? error.message : 'could not be read'}`);
-      }
-    }
-
-    if (loaded.length > 0) addFiles(loaded);
-    if (errors.length > 0) {
-      showToast(`${errors.length} ${errors.length === 1 ? 'file could' : 'files could'} not be added. ${errors.slice(0, 2).join(' ')}`, 'error', 7000);
-    } else if (loaded.length === 0) {
-      showToast('No supported audio files were selected.', 'error');
-    }
+    await addFilesFromPaths(paths);
   } catch (error: unknown) {
     showToast(error instanceof Error ? error.message : 'The file picker could not be opened.', 'error');
   }
+}
+
+async function addFilesFromPaths(paths: readonly string[], ignoredCount = 0): Promise<void> {
+  if (paths.length === 0) {
+    if (ignoredCount > 0) showToast('No supported audio files were dropped.', 'error');
+    return;
+  }
+
+  showToast(`Loading ${paths.length} ${paths.length === 1 ? 'file' : 'files'}…`, 'info');
+  const loaded: File[] = [];
+  const errors: string[] = [];
+
+  // Keep the imported list useful even if one selected file is corrupt or inaccessible.
+  for (let index = 0; index < paths.length; index += 1) {
+    const path = paths[index];
+    if (!path) continue;
+    try {
+      const bytes = await readFile(path);
+      if (bytes.byteLength === 0) throw new Error('The file is empty.');
+      const extension = extensionFromPath(path) ?? detectAudioExtension(bytes);
+      if (!extension) throw new Error('The file does not appear to be a supported audio format.');
+      const suggestedName = filenameFromPath(path);
+      const hasUsefulFilename = suggestedName && hasAudioExtension(suggestedName);
+      const name = hasUsefulFilename ? suggestedName : `Track ${tracks.length + loaded.length + 1}.${extension}`;
+      const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+      loaded.push(new File([arrayBuffer], name, { type: MIME_BY_EXTENSION[extension] ?? 'application/octet-stream' }));
+    } catch (error: unknown) {
+      const shortName = filenameFromPath(path) || `Selected file ${index + 1}`;
+      errors.push(`${shortName}: ${error instanceof Error ? error.message : 'could not be read'}`);
+    }
+  }
+
+  if (loaded.length > 0) addFiles(loaded);
+  if (errors.length > 0) {
+    showToast(`${errors.length} ${errors.length === 1 ? 'file could' : 'files could'} not be added. ${errors.slice(0, 2).join(' ')}`, 'error', 7000);
+  } else if (loaded.length === 0) {
+    showToast('No supported audio files were selected.', 'error');
+  }
+}
+
+/** Drag-and-drop import: native file drops in the desktop app, standard HTML5 drops in the browser. */
+function initFileDrop(): void {
+  const setOverlay = (visible: boolean): void => {
+    elements.dropOverlay.hidden = !visible;
+    document.body.classList.toggle('is-file-dragging', visible);
+  };
+
+  if (isTauri()) {
+    // The webview intercepts OS file drops, so paths arrive through Tauri's own drag-drop event.
+    void getCurrentWebview().onDragDropEvent((event) => {
+      const payload = event.payload;
+      if (payload.type === 'enter') {
+        setOverlay(true);
+      } else if (payload.type === 'leave') {
+        setOverlay(false);
+      } else if (payload.type === 'drop') {
+        setOverlay(false);
+        const supported = payload.paths.filter((path) => extensionFromPath(path) !== null);
+        void addFilesFromPaths(supported, payload.paths.length - supported.length);
+      }
+    }).catch(() => {
+      // Drag-and-drop is an enhancement; the file picker still works if the event cannot be registered.
+    });
+    return;
+  }
+
+  let depth = 0;
+  const hasFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer?.types ?? []).includes('Files');
+
+  window.addEventListener('dragenter', (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    depth += 1;
+    setOverlay(true);
+  });
+  window.addEventListener('dragover', (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+  });
+  window.addEventListener('dragleave', (event) => {
+    if (!hasFiles(event)) return;
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) setOverlay(false);
+  });
+  window.addEventListener('drop', (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    depth = 0;
+    setOverlay(false);
+    const files = event.dataTransfer ? Array.from(event.dataTransfer.files) : [];
+    if (files.length > 0) addFiles(files);
+  });
+}
+
+function reorderTracks(orderedIds: readonly string[]): void {
+  const byId = new Map(tracks.map((track) => [track.id, track] as const));
+  const reordered = orderedIds.map((id) => byId.get(id)).filter((track): track is Track => track !== undefined);
+  // Ignore stale or partial orders so a track can never be lost by a reorder.
+  if (reordered.length === tracks.length) tracks = reordered;
+  renderPlaylist();
 }
 
 function addFiles(files: readonly File[]): void {
@@ -672,10 +770,26 @@ function renderAudioState(snapshot: AudioSnapshot): void {
   elements.playButton.classList.toggle('is-playing', !snapshot.paused && currentTrackId !== null);
   elements.playButton.setAttribute('aria-label', snapshot.paused ? 'Play' : 'Pause');
   elements.playButton.title = snapshot.paused ? 'Play' : 'Pause';
-  elements.volumeSlider.value = String(snapshot.volume);
-  elements.volumeSlider.style.setProperty('--range-progress', `${snapshot.volume * 100}%`);
+  renderVolume(snapshot.volume);
   elements.seekSlider.style.setProperty('--range-progress', `${snapshot.duration > 0 ? snapshot.currentTime / snapshot.duration * 100 : 0}%`);
   renderTimeline(snapshot);
+}
+
+function setVolume(value: number): void {
+  const volume = Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+  audio.setVolume(volume);
+  saveVolume(volume);
+  renderVolume(volume);
+}
+
+function renderVolume(value: number): void {
+  const volume = Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+  const percentage = Math.round(volume * 100);
+  elements.volumeSlider.value = String(volume);
+  elements.volumeSlider.style.setProperty('--range-progress', `${percentage}%`);
+  elements.volumeValue.value = `${percentage}%`;
+  elements.volumeValue.textContent = `${percentage}%`;
+  elements.volumeValue.setAttribute('aria-label', `Volume ${percentage} percent`);
 }
 
 function renderTimeline(snapshot: AudioSnapshot): void {

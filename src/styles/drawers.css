@@ -149,7 +149,56 @@
   display: none;
 }
 
+.track-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 14px;
+}
+
+.track-row.is-dragging {
+  position: relative;
+  z-index: 2;
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg, transparent));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.track-list.is-reordering,
+.track-list.is-reordering * {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.track-drag-handle {
+  flex: none;
+  width: 22px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--muted-soft);
+  opacity: 0.45;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.track-drag-handle svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.track-row:hover .track-drag-handle,
+.track-drag-handle:focus-visible,
+.track-row.is-dragging .track-drag-handle {
+  opacity: 1;
+  color: var(--accent);
+}
+
 .track-row-button {
+  flex: 1;
+  min-width: 0;
   width: 100%;
   display: grid;
   grid-template-columns: 28px 1fr auto 24px;
@@ -254,11 +303,20 @@
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--text) 3%, transparent);
   text-align: left;
-  transition: border-color 0.2s, background 0.2s, transform 0.2s var(--ease), box-shadow 0.2s;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 13px;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s var(--ease), box-shadow 0.2s, color 0.2s;
 }
 
 .choice:hover {
-  border-color: var(--line-strong);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.choice:active {
+  transform: scale(0.985);
 }
 
 .choice.is-active {
@@ -324,6 +382,54 @@
   align-items: flex-start;
 }
 
+.choice-wide {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/* Character movement presets are compact, descriptive cards rather than a row of bare labels. */
+#character-vibe-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#character-vibe-options .choice {
+  width: 100%;
+  min-height: 67px;
+  align-items: flex-start;
+  padding: 10px 11px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--text) 3.5%, var(--surface));
+}
+
+#character-vibe-options .choice:hover {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--line-strong));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+#character-vibe-options .choice.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 75%, transparent) inset,
+    0 8px 22px -16px var(--accent);
+}
+
+#character-vibe-options .choice-label {
+  color: var(--text);
+  font-size: 0.83rem;
+}
+
+#character-vibe-options .choice-detail {
+  font-size: 0.70rem;
+  line-height: 1.35;
+}
+
+.spectrum-settings-group[hidden] {
+  display: none;
+}
+
 /* Mode and cursor: a segmented control */
 .segmented {
   display: grid;
@@ -338,6 +444,7 @@
 
 .segmented .choice {
   height: 36px;
+  padding: 0 6px;
   justify-content: center;
   border: 0;
   border-radius: 10px;
@@ -408,4 +515,534 @@
 
 .range-setting .hint {
   line-height: 1.45;
+}
+
+
+.settings-group .choice:focus-visible,
+.settings-group .text-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Theme system refresh — immersive, tactile choices that inherit the active palette.
+   --------------------------------------------------------------------------------------------- */
+
+.settings-panel {
+  width: min(440px, 100%);
+  background:
+    radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 44%),
+    radial-gradient(ellipse at 0% 100%, color-mix(in srgb, var(--accent-2) 6%, transparent), transparent 40%),
+    linear-gradient(155deg, color-mix(in srgb, var(--surface-strong) 92%, var(--accent) 8%), var(--surface-strong) 46%);
+  border-left-color: color-mix(in srgb, var(--accent) 24%, var(--line-strong));
+  backdrop-filter: blur(30px) saturate(1.18);
+  -webkit-backdrop-filter: blur(30px) saturate(1.18);
+}
+
+.drawer-header {
+  padding-bottom: 19px;
+}
+
+.drawer-header h2 {
+  font-size: 1.58rem;
+  letter-spacing: -0.045em;
+}
+
+.drawer-body {
+  gap: 27px;
+  padding-top: 21px;
+  padding-bottom: 22px;
+  scrollbar-color: color-mix(in srgb, var(--accent) 38%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.settings-group {
+  gap: 11px;
+}
+
+.group-title {
+  color: var(--accent-strong);
+  letter-spacing: 0.13em;
+  font-size: 0.68rem;
+}
+
+.group-description {
+  margin-top: -4px;
+  color: var(--muted-soft);
+  font-size: 0.79rem;
+  line-height: 1.5;
+}
+
+/* Theme choices are preview cards, not just a label and a small dot. */
+#theme-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+#theme-options .choice {
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 76px;
+  padding: 9px;
+  overflow: hidden;
+  border-radius: 15px;
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--text) 5%, var(--surface)), var(--surface));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 5%, transparent);
+  transition: transform 0.22s var(--ease), border-color 0.22s, background 0.22s, box-shadow 0.22s;
+}
+
+#theme-options .choice::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+  background: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0;
+  scale: 0.7;
+  transition: opacity 0.18s, scale 0.18s var(--ease);
+}
+
+#theme-options .choice:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line-strong));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface));
+  box-shadow: 0 9px 22px -18px var(--accent), inset 0 1px 0 color-mix(in srgb, white 7%, transparent);
+}
+
+#theme-options .choice:active {
+  transform: scale(0.975);
+}
+
+#theme-options .choice.is-active {
+  border-color: var(--accent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 15%, var(--surface)), var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 48%, transparent) inset,
+    0 9px 25px -20px var(--accent);
+}
+
+#theme-options .choice.is-active::after {
+  content: '✓';
+  opacity: 1;
+  scale: 1;
+}
+
+#theme-options .choice-swatch {
+  position: relative;
+  isolation: isolate;
+  width: 48px;
+  height: 54px;
+  overflow: hidden;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 72% 24%, color-mix(in srgb, var(--swatch-c) 84%, white 16%) 0 12%, transparent 39%),
+    linear-gradient(145deg, var(--swatch-a) 0 46%, var(--swatch-b) 47% 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), 0 5px 14px -9px var(--swatch-a);
+  transition: transform 0.25s var(--ease), filter 0.25s;
+}
+
+#theme-options .choice-swatch::before,
+#theme-options .choice-swatch::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+
+#theme-options .choice-swatch::before {
+  width: 34px;
+  height: 34px;
+  top: 11px;
+  left: 7px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.8), color-mix(in srgb, var(--swatch-a) 75%, transparent) 34%, transparent 74%);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--swatch-a) 60%, transparent);
+}
+
+#theme-options .choice-swatch::after {
+  width: 28px;
+  height: 5px;
+  left: 10px;
+  bottom: 5px;
+  border-radius: 99px;
+  background: color-mix(in srgb, white 78%, var(--swatch-c));
+  opacity: 0.8;
+}
+
+#theme-options .choice:hover .choice-swatch {
+  transform: rotate(-3deg) scale(1.035);
+  filter: saturate(1.12);
+}
+
+#theme-options .choice.is-active .choice-swatch {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent), 0 7px 18px -10px var(--accent);
+}
+
+#theme-options .choice-text {
+  align-items: flex-start;
+  gap: 4px;
+  padding-right: 1px;
+}
+
+#theme-options .choice-label {
+  max-width: 100%;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 720;
+  letter-spacing: -0.015em;
+}
+
+#theme-options .choice-description {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted-soft);
+  font-size: 0.66rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Mode, scene and cursor controls share the same selected-state language. */
+.segmented {
+  padding: 4px;
+  border-color: var(--line-strong);
+  background: color-mix(in srgb, var(--text) 4%, var(--surface-strong));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.segmented .choice {
+  min-height: 38px;
+  border-radius: 10px;
+  transition: color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.2s var(--ease);
+}
+
+.segmented .choice:not(.is-active):hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  transform: none;
+}
+
+.segmented .choice.is-active {
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 76%, var(--accent-2)));
+  box-shadow: 0 5px 14px -8px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+#scene-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#scene-options .choice-scene {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 154px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 8px;
+  overflow: hidden;
+  border-radius: 15px;
+  border-color: var(--line);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--text) 5%, var(--surface)), var(--surface));
+  text-align: left;
+}
+
+#scene-options .choice-scene:hover {
+  border-color: color-mix(in srgb, var(--accent) 64%, var(--line-strong));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface));
+  transform: translateY(-2px);
+}
+
+#scene-options .choice-scene.is-active {
+  border-color: var(--accent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 15%, var(--surface)), var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent) inset,
+    0 10px 24px -18px var(--accent);
+}
+
+#scene-options .choice-scene.is-active::after {
+  content: '✓';
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--accent-ink);
+  background: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--accent) 48%, transparent);
+}
+
+.scene-preview {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  width: 100%;
+  height: 76px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #101326;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.11);
+}
+
+.scene-preview::before,
+.scene-preview::after,
+.scene-preview__core,
+.scene-preview__wave {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.scene-preview::before,
+.scene-preview::after {
+  content: '';
+}
+
+/* Bloom: the original soft orb, breathing core and expanding rings. */
+.scene-preview[data-scene-preview="bloom"] {
+  background: radial-gradient(ellipse at 50% 48%, #34305d 0, #191b32 44%, #090e1b 100%);
+}
+.scene-preview[data-scene-preview="bloom"] .scene-preview__core {
+  left: calc(50% - 17px); top: 20px; width: 34px; height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 27%, #fff2ee 0, #f7a8d9 18%, #9e8bff 48%, #3d467f 78%, transparent 100%);
+  box-shadow: 0 0 15px rgba(178, 151, 255, 0.56), 0 0 34px rgba(104, 188, 255, 0.22);
+}
+.scene-preview[data-scene-preview="bloom"]::before {
+  inset: 10px 39px;
+  border: 1px solid rgba(170, 190, 255, 0.42);
+  border-radius: 50%;
+  transform: scaleY(0.48);
+}
+.scene-preview[data-scene-preview="bloom"]::after {
+  inset: 16px 29px;
+  border: 1px solid rgba(246, 166, 225, 0.28);
+  border-radius: 50%;
+  transform: rotate(-18deg) scaleY(0.35);
+}
+
+/* Frequency Grid: a luminous perspective field. */
+.scene-preview[data-scene-preview="spectrum"] {
+  background: linear-gradient(180deg, #10182b 0 37%, #142e46 100%);
+}
+.scene-preview[data-scene-preview="spectrum"]::before {
+  inset: 27px 0 0;
+  background: repeating-linear-gradient(90deg, rgba(93, 223, 255, 0.25) 0 1px, transparent 1px 12px),
+    repeating-linear-gradient(0deg, rgba(93, 223, 255, 0.22) 0 1px, transparent 1px 10px);
+  transform: perspective(90px) rotateX(42deg) scale(1.35, 1.5);
+  transform-origin: center bottom;
+}
+.scene-preview[data-scene-preview="spectrum"] .scene-preview__core {
+  inset: auto 8px 4px;
+  height: 43px;
+  background: repeating-linear-gradient(90deg, #67e9ed 0 3px, transparent 3px 7px, #9685ff 7px 10px, transparent 10px 15px);
+  clip-path: polygon(0 60%, 6% 46%, 12% 70%, 18% 22%, 24% 45%, 30% 8%, 36% 48%, 42% 29%, 48% 62%, 54% 5%, 60% 47%, 66% 16%, 72% 56%, 78% 27%, 84% 53%, 90% 4%, 96% 48%, 100% 37%, 100% 100%, 0 100%);
+  opacity: 0.9;
+}
+
+/* Soft Halo: a single muted centre glow and one quiet rim. */
+.scene-preview[data-scene-preview="waveform"] {
+  background: radial-gradient(ellipse at 50% 50%, #26314d 0, #151b2e 48%, #0a101e 100%);
+}
+.scene-preview[data-scene-preview="waveform"] .scene-preview__core {
+  left: calc(50% - 16px); top: 21px; width: 32px; height: 32px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.9), rgba(133,190,236,.5) 34%, rgba(135,123,224,.12) 72%, transparent 100%);
+  box-shadow: 0 0 22px rgba(142, 179, 255, 0.22);
+}
+.scene-preview[data-scene-preview="waveform"] .scene-preview__wave {
+  left: 29%; top: 23px; width: 42%; height: 29px;
+  border: 1px solid rgba(162, 194, 241, 0.35);
+  border-radius: 50%;
+  transform: rotate(-12deg) scaleY(.48);
+}
+
+/* Constellation: connected stars suspended in a deep field. */
+.scene-preview[data-scene-preview="particles"] {
+  background: radial-gradient(ellipse at 50% 50%, #1b2b59 0, #10162d 54%, #080d1b 100%);
+}
+.scene-preview[data-scene-preview="particles"]::before {
+  inset: 0;
+  background: radial-gradient(circle at 12% 25%, #a9c9ff 0 1px, transparent 2px), radial-gradient(circle at 33% 66%, #6be5ef 0 1px, transparent 2px), radial-gradient(circle at 51% 24%, #d3b3ff 0 1.5px, transparent 2.5px), radial-gradient(circle at 75% 42%, #91f1e4 0 1px, transparent 2px), radial-gradient(circle at 86% 77%, #a9c9ff 0 1px, transparent 2px), radial-gradient(circle at 20% 83%, #f0b7ed 0 1px, transparent 2px);
+}
+.scene-preview[data-scene-preview="particles"] .scene-preview__core {
+  inset: 12px 30px;
+  border: 1px solid rgba(116, 218, 255, 0.4);
+  border-radius: 50%;
+  transform: rotate(-18deg) scaleY(0.62);
+}
+.scene-preview[data-scene-preview="particles"] .scene-preview__wave {
+  left: 24%; top: 22%; width: 51%; height: 58%;
+  border: 1px solid rgba(164, 142, 255, 0.62);
+  border-radius: 50%;
+  transform: rotate(34deg) scaleY(0.7);
+}
+
+/* Orbit Engine: a central instrument with elliptical satellites. */
+.scene-preview[data-scene-preview="rings"] {
+  background: radial-gradient(circle at 50% 50%, #26345b 0, #12172c 48%, #090e1a 100%);
+}
+.scene-preview[data-scene-preview="rings"]::before {
+  inset: 19px 32px;
+  border: 1px solid rgba(102, 227, 247, 0.85);
+  border-radius: 50%;
+  transform: rotate(-28deg) scaleY(0.34);
+  box-shadow: 0 0 8px rgba(95, 216, 255, 0.3);
+}
+.scene-preview[data-scene-preview="rings"]::after {
+  inset: 11px 21px;
+  border: 1px solid rgba(183, 133, 255, 0.55);
+  border-radius: 50%;
+  transform: rotate(25deg) scaleY(0.45);
+}
+.scene-preview[data-scene-preview="rings"] .scene-preview__core {
+  left: calc(50% - 11px);
+  top: 27px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #fff, #74dcf2 26%, #7768df 58%, #1b1743 100%);
+  box-shadow: 0 0 14px rgba(124, 169, 255, 0.75);
+}
+
+/* Calm: no shapes, animation or decorative visual. */
+.scene-preview[data-scene-preview="aurora"] {
+  background: #101522;
+}
+.scene-preview[data-scene-preview="aurora"]::before,
+.scene-preview[data-scene-preview="aurora"]::after,
+.scene-preview[data-scene-preview="aurora"] .scene-preview__core,
+.scene-preview[data-scene-preview="aurora"] .scene-preview__wave {
+  display: none;
+}
+
+/* Moonlight: one quiet eclipse in an open night sky. */
+.scene-preview[data-scene-preview="still"] {
+  background: radial-gradient(ellipse at 50% 52%, #283051 0, #151c33 52%, #090e1b 100%);
+}
+.scene-preview[data-scene-preview="still"] .scene-preview__core {
+  left: 39%; top: 11px; width: 34px; height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 26%, #fff8ea, #b9c7e8 42%, #697a9d 100%);
+  box-shadow: 0 0 15px rgba(183, 208, 255, 0.45);
+}
+.scene-preview[data-scene-preview="still"] .scene-preview__wave {
+  left: 45%; top: 7px; width: 35px; height: 35px;
+  border-radius: 50%;
+  background: #151c33;
+  box-shadow: -2px 0 0 rgba(235, 219, 189, 0.5);
+}
+.scene-preview[data-scene-preview="still"]::before {
+  inset: 13px 24px;
+  border: 1px solid rgba(156, 186, 232, 0.28);
+  border-radius: 50%;
+  transform: rotate(-17deg) scaleY(0.36);
+}
+
+#scene-options .choice-text {
+  gap: 3px;
+}
+
+#scene-options .choice-label {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 720;
+  letter-spacing: -0.015em;
+}
+
+#scene-options .choice-detail {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted-soft);
+  font-size: 0.68rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.range-slider {
+  accent-color: var(--accent);
+}
+
+.range-setting,
+.range-row {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--text) 3%, var(--surface));
+}
+
+.range-row {
+  padding-block: 7px;
+}
+
+.drawer-footer {
+  border-top-color: var(--line-strong);
+}
+
+#settings-reset {
+  padding: 8px 10px;
+  border: 1px solid transparent;
+}
+
+#settings-reset:hover {
+  color: var(--accent-strong);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+@media (max-width: 420px) {
+  #theme-options {
+    gap: 7px;
+  }
+
+  #theme-options .choice {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 8px;
+    min-height: 72px;
+    padding: 8px;
+  }
+
+  #theme-options .choice-swatch {
+    width: 42px;
+    height: 49px;
+  }
+
+  #theme-options .choice-swatch::before {
+    width: 30px;
+    height: 30px;
+    top: 10px;
+    left: 6px;
+  }
+
+  #theme-options .choice-description {
+    font-size: 0.62rem;
+  }
 }

@@ -5,8 +5,8 @@
   overflow: visible;
   scale: calc(1 + var(--bass, 0) * 0.045 + var(--beat, 0) * 0.018);
   transform-origin: center;
+  will-change: scale, filter;
   filter: drop-shadow(0 0 calc(2px + var(--bass, 0) * 6px) color-mix(in srgb, var(--accent) 60%, transparent));
-  transition: scale 90ms linear, filter 120ms linear;
 }
 
 .pulse-glyph .pulse-line,
@@ -39,14 +39,17 @@
   stroke-width: 5.4;
   stroke-dasharray: 14 86;
   stroke-dashoffset: 14;
-  opacity: 0;
+  opacity: 0.12;
   filter: drop-shadow(0 0 4px #fff);
+  /* Stay mounted while idle: toggling playback only changes opacity, never animation phase. */
+  animation: pulse-trace 2.4s linear infinite;
+  animation-play-state: running;
+  transition: opacity 240ms ease;
 }
 
 body.is-playing .pulse-glyph .pulse-trace,
 body.is-listening .pulse-glyph .pulse-trace {
   opacity: 0.92;
-  animation: pulse-trace 1.8s linear infinite;
 }
 
 .pulse-glyph .pulse-dot {
@@ -56,7 +59,6 @@ body.is-listening .pulse-glyph .pulse-trace {
   transform-origin: center;
   scale: calc(1 + var(--beat, 0) * 0.45 + var(--bass, 0) * 0.18);
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent-2) 70%, transparent));
-  animation: pulse-fade 0.4s ease 0.8s both;
 }
 
 .pulse-glyph .pulse-ring {
@@ -75,15 +77,11 @@ body.is-listening .pulse-glyph .pulse-trace {
 
 @keyframes pulse-trace {
   from { stroke-dashoffset: 14; }
-  to { stroke-dashoffset: -100; }
-}
-
-@keyframes pulse-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  /* 14 → -86 is exactly one 100-unit dash cycle, so the wrap has no positional jump. */
+  to { stroke-dashoffset: -86; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse-glyph { transition: none; }
   .pulse-glyph .pulse-trace { animation: none !important; }
+  .pulse-glyph .pulse-line { animation: none !important; stroke-dashoffset: 0; }
 }

@@ -1,5 +1,6 @@
 import {
   CURSOR_IDS,
+  CHARACTER_VIBES,
   DEFAULT_SETTINGS,
   MODE_IDS,
   REACTIVITY_MAX,
@@ -12,6 +13,7 @@ import {
   THEME_IDS,
   settings,
   type CursorStyle,
+  type CharacterVibe,
   type ModeSetting,
   type SceneId,
   type Settings,
@@ -22,12 +24,28 @@ import { THEMES } from './themes';
 
 const MODE_LABELS: Record<ModeSetting, string> = { system: 'Auto', dark: 'Dark', light: 'Light' };
 const CURSOR_LABELS: Record<CursorStyle, string> = { dot: 'Dot', ring: 'Ring', halo: 'Halo', native: 'System' };
+const CHARACTER_VIBE_LABELS: Record<CharacterVibe, string> = {
+  auto: 'Auto', ambient: 'Ambient', lofi: 'Lo-fi', funk: 'Funk',
+  pop: 'Pop', rock: 'Rock / Metal', classical: 'Classical', electronic: 'Electronic',
+};
+const CHARACTER_VIBE_DETAILS: Record<CharacterVibe, string> = {
+  auto: 'Adapts to detected energy and beat timing',
+  ambient: 'Slow, calm breathing and gentle swaying',
+  lofi: 'Soft nods and relaxed shoulder movement',
+  funk: 'Confident groove with shoulder and hip rhythm',
+  pop: 'Livelier bounce and expressive gestures',
+  rock: 'Stronger head nods and upper-body accents',
+  classical: 'Measured posture and elegant, slow motion',
+  electronic: 'Tighter beat response and energetic accents',
+};
 
 interface Choice<T extends string> {
   value: T;
   label: string;
   detail?: string;
-  swatch?: [string, string];
+  description?: string;
+  swatch?: [string, string, string];
+  visual?: string;
 }
 
 /** The right-hand drawer where the theme, mode, background and cursor are chosen. */
@@ -43,6 +61,7 @@ export class SettingsPanel {
   private readonly spectrumBlendValue: HTMLElement;
   private readonly spectrumDensity: HTMLInputElement;
   private readonly spectrumDensityValue: HTMLElement;
+  private readonly spectrumGroup: HTMLElement;
   private readonly groups: Array<{ key: keyof Settings; container: HTMLElement }>;
   private readonly onOpenChange: ((open: boolean) => void) | undefined;
 
@@ -59,12 +78,14 @@ export class SettingsPanel {
     this.spectrumBlendValue = requiredElement('spectrum-blend-value');
     this.spectrumDensity = requiredElement<HTMLInputElement>('spectrum-density-slider');
     this.spectrumDensityValue = requiredElement('spectrum-density-value');
+    this.spectrumGroup = requiredElement('spectrum-settings-group');
 
     this.groups = [
       { key: 'theme', container: this.renderChoices('theme-options', THEME_IDS.map((id) => ({
         value: id,
         label: THEMES[id].name,
-        swatch: [THEMES[id].dark.accent, THEMES[id].dark.accent2] as [string, string],
+        description: THEMES[id].description,
+        swatch: THEMES[id].preview,
       })), (value) => settings.update({ theme: value as ThemeId })) },
       { key: 'mode', container: this.renderChoices('mode-options', MODE_IDS.map((id) => ({
         value: id,
@@ -74,11 +95,17 @@ export class SettingsPanel {
         value: id,
         label: SCENES[id].label,
         detail: SCENES[id].description,
+        visual: id,
       })), (value) => settings.update({ scene: value as SceneId })) },
       { key: 'cursor', container: this.renderChoices('cursor-options', CURSOR_IDS.map((id) => ({
         value: id,
         label: CURSOR_LABELS[id],
       })), (value) => settings.update({ cursor: value as CursorStyle })) },
+      { key: 'characterVibe', container: this.renderChoices('character-vibe-options', CHARACTER_VIBES.map((id) => ({
+        value: id,
+        label: CHARACTER_VIBE_LABELS[id],
+        detail: CHARACTER_VIBE_DETAILS[id],
+      })), (value) => settings.update({ characterVibe: value as CharacterVibe })) },
     ];
 
     this.toggle.addEventListener('click', () => this.setOpen(!this.isOpen()));
@@ -134,7 +161,7 @@ export class SettingsPanel {
     container.replaceChildren(...choices.map((choice) => {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = choice.detail ? 'choice choice-wide' : 'choice';
+      button.className = choice.visual ? 'choice choice-scene' : choice.swatch ? 'choice choice-theme' : choice.detail ? 'choice choice-wide' : 'choice';
       button.dataset.value = choice.value;
       button.setAttribute('aria-pressed', 'false');
 
@@ -143,8 +170,22 @@ export class SettingsPanel {
         swatch.className = 'choice-swatch';
         swatch.style.setProperty('--swatch-a', choice.swatch[0]);
         swatch.style.setProperty('--swatch-b', choice.swatch[1]);
+        swatch.style.setProperty('--swatch-c', choice.swatch[2]);
         swatch.setAttribute('aria-hidden', 'true');
         button.append(swatch);
+      }
+
+      if (choice.visual) {
+        const preview = document.createElement('span');
+        preview.className = 'scene-preview';
+        preview.dataset.scenePreview = choice.visual;
+        preview.setAttribute('aria-hidden', 'true');
+        const core = document.createElement('span');
+        core.className = 'scene-preview__core';
+        const wave = document.createElement('span');
+        wave.className = 'scene-preview__wave';
+        preview.append(core, wave);
+        button.append(preview);
       }
 
       const text = document.createElement('span');
@@ -153,10 +194,11 @@ export class SettingsPanel {
       label.className = 'choice-label';
       label.textContent = choice.label;
       text.append(label);
-      if (choice.detail) {
+      const supportingText = choice.description ?? choice.detail;
+      if (supportingText) {
         const detail = document.createElement('span');
-        detail.className = 'choice-detail';
-        detail.textContent = choice.detail;
+        detail.className = choice.description ? 'choice-description' : 'choice-detail';
+        detail.textContent = supportingText;
         text.append(detail);
       }
       button.append(text);
@@ -168,6 +210,7 @@ export class SettingsPanel {
   }
 
   private sync(current: Readonly<Settings>): void {
+    this.spectrumGroup.hidden = current.scene !== 'spectrum';
     for (const group of this.groups) {
       const selected = String(current[group.key]);
       for (const button of group.container.querySelectorAll<HTMLButtonElement>('button')) {

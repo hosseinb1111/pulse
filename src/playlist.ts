@@ -6,6 +6,7 @@ export interface Track {
 }
 
 export type TrackSelectHandler = (trackId: string) => void;
+export type TrackReorderHandler = (orderedIds: string[]) => void;
 
 export function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -45,8 +46,12 @@ export class PlaylistView {
   private readonly backdrop: HTMLElement;
   private readonly toggleButton: HTMLButtonElement;
   private readonly selectHandler: TrackSelectHandler;
+  private readonly reorderHandler: TrackReorderHandler;
+  private dragging: { row: HTMLElement; pointerId: number } | null = null;
+  private lastRender: { tracks: readonly Track[]; activeTrackId: string | null } | null = null;
+  private pendingRender: { tracks: readonly Track[]; activeTrackId: string | null } | null = null;
 
-  constructor(selectHandler: TrackSelectHandler) {
+  constructor(selectHandler: TrackSelectHandler, reorderHandler: TrackReorderHandler) {
     this.list = requiredElement<HTMLOListElement>('track-list');
     this.emptyState = requiredElement<HTMLElement>('playlist-empty');
     this.summary = requiredElement<HTMLElement>('playlist-summary');
@@ -56,6 +61,13 @@ export class PlaylistView {
     this.backdrop = requiredElement<HTMLElement>('panel-backdrop');
     this.toggleButton = requiredElement<HTMLButtonElement>('playlist-toggle');
     this.selectHandler = selectHandler;
+    this.reorderHandler = reorderHandler;
+
+    this.list.addEventListener('pointerdown', (event: PointerEvent) => this.startDrag(event));
+    this.list.addEventListener('pointermove', (event: PointerEvent) => this.moveDrag(event));
+    this.list.addEventListener('pointerup', (event: PointerEvent) => this.endDrag(event, true));
+    this.list.addEventListener('pointercancel', (event: PointerEvent) => this.endDrag(event, false));
+    this.list.addEventListener('keydown', (event: KeyboardEvent) => this.handleHandleKey(event));
 
     this.list.addEventListener('click', (event: MouseEvent) => {
       const target = event.target;
@@ -71,6 +83,12 @@ export class PlaylistView {
   }
 
   render(tracks: readonly Track[], activeTrackId: string | null): void {
+    // Re-rendering mid-drag would destroy the row being moved; apply it once the drag ends.
+    if (this.dragging) {
+      this.pendingRender = { tracks, activeTrackId };
+      return;
+    }
+    this.lastRender = { tracks, activeTrackId };
     this.list.replaceChildren();
     this.emptyState.hidden = tracks.length > 0;
     this.list.hidden = tracks.length === 0;
@@ -85,6 +103,15 @@ export class PlaylistView {
     tracks.forEach((track, index) => {
       const item = document.createElement('li');
       item.className = `track-row${track.id === activeTrackId ? ' is-active' : ''}`;
+      item.dataset.rowId = track.id;
+
+      const handle = document.createElement('button');
+      handle.className = 'track-drag-handle';
+      handle.type = 'button';
+      handle.dataset.dragHandle = track.id;
+      handle.setAttribute('aria-label', `Reorder ${track.name}. Drag, or use the up and down arrow keys.`);
+      handle.title = 'Drag to reorder';
+      handle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
 
       const button = document.createElement('button');
       button.className = 'track-row-button';
@@ -115,10 +142,82 @@ export class PlaylistView {
       playIndicator.className = 'track-play-indicator';
       playIndicator.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z" /></svg>';
       button.append(number, info, duration, playIndicator);
-      item.append(button);
+      item.append(handle, button);
       fragment.append(item);
     });
     this.list.append(fragment);
+  }
+
+  private rowIds(): string[] {
+    return Array.from(this.list.children).map((child) => (child as HTMLElement).dataset.rowId ?? '').filter(Boolean);
+  }
+
+  private startDrag(event: PointerEvent): void {
+    if (this.dragging || event.button > 0) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const handle = target.closest<HTMLElement>('[data-drag-handle]');
+    const row = handle?.closest<HTMLElement>('.track-row');
+    if (!handle || !row) return;
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    this.dragging = { row, pointerId: event.pointerId };
+    row.classList.add('is-dragging');
+    this.list.classList.add('is-reordering');
+  }
+
+  private moveDrag(event: PointerEvent): void {
+    const drag = this.dragging;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+
+    // Keep the list scrolling when the pointer nears its top or bottom edge.
+    const bounds = this.list.getBoundingClientRect();
+    if (event.clientY < bounds.top + 32) this.list.scrollTop -= 12;
+    else if (event.clientY > bounds.bottom - 32) this.list.scrollTop += 12;
+
+    const siblings = Array.from(this.list.children).filter((child) => child !== drag.row) as HTMLElement[];
+    const next = siblings.find((sibling) => {
+      const box = sibling.getBoundingClientRect();
+      return event.clientY < box.top + box.height / 2;
+    });
+    if (next) {
+      if (drag.row.nextElementSibling !== next) this.list.insertBefore(drag.row, next);
+    } else if (this.list.lastElementChild !== drag.row) {
+      this.list.append(drag.row);
+    }
+  }
+
+  private endDrag(event: PointerEvent, commit: boolean): void {
+    const drag = this.dragging;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    this.dragging = null;
+    drag.row.classList.remove('is-dragging');
+    this.list.classList.remove('is-reordering');
+
+    const pending = this.pendingRender;
+    this.pendingRender = null;
+    if (commit) this.reorderHandler(this.rowIds());
+    // A cancelled drag, or a render queued during the drag, must redraw from the source of truth.
+    if (!commit) {
+      const latest = pending ?? this.lastRender;
+      if (latest) this.render(latest.tracks, latest.activeTrackId);
+    }
+  }
+
+  private handleHandleKey(event: KeyboardEvent): void {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const handle = target.closest<HTMLElement>('[data-drag-handle]');
+    const row = handle?.closest<HTMLElement>('.track-row');
+    if (!handle || !row) return;
+    event.preventDefault();
+    const sibling = event.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+    if (!sibling) return;
+    if (event.key === 'ArrowUp') this.list.insertBefore(row, sibling);
+    else this.list.insertBefore(sibling, row);
+    handle.focus();
+    this.reorderHandler(this.rowIds());
   }
 
   setOpen(open: boolean): void {

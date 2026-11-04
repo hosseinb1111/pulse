@@ -48,13 +48,17 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 62% 52% at 8% -8%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 72%),
+    radial-gradient(ellipse 48% 44% at 100% 100%, color-mix(in srgb, var(--accent-2) 9%, transparent), transparent 74%);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.5;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.4s var(--ease), color 0.4s var(--ease);
+  transition: background-color 0.4s var(--ease), color 0.4s var(--ease), background-image 0.4s var(--ease);
 }
 
 body.playlist-open,
@@ -85,6 +89,44 @@ h2,
 h3,
 p {
   margin: 0;
+}
+
+
+/* Theme-aware selection; native editable controls keep their platform selection colours. */
+::selection {
+  background: color-mix(in srgb, var(--accent) 86%, black);
+  color: var(--accent-ink);
+  text-shadow: none;
+}
+
+::-moz-selection {
+  background: color-mix(in srgb, var(--accent) 86%, black);
+  color: var(--accent-ink);
+  text-shadow: none;
+}
+
+input::selection,
+textarea::selection,
+[contenteditable="true"]::selection,
+[contenteditable="true"] *::selection,
+[data-code-editor]::selection,
+[data-code-editor] *::selection,
+.monaco-editor ::selection,
+.cm-content ::selection {
+  background: Highlight;
+  color: HighlightText;
+}
+
+input::-moz-selection,
+textarea::-moz-selection,
+[contenteditable="true"]::-moz-selection,
+[contenteditable="true"] *::-moz-selection,
+[data-code-editor]::-moz-selection,
+[data-code-editor] *::-moz-selection,
+.monaco-editor ::-moz-selection,
+.cm-content ::-moz-selection {
+  background: Highlight;
+  color: HighlightText;
 }
 
 /* Icons are stroked line art by default; solid glyphs opt in with .is-solid or the classes below. */
@@ -173,4 +215,42 @@ svg {
 
 .toast-error .toast-marker {
   background: var(--danger);
+}
+
+/* File drag-and-drop overlay */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--accent) 14%, rgba(0, 0, 0, 0.6));
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.drop-overlay[hidden] {
+  display: none;
+}
+
+.drop-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 48px;
+  border: 2px dashed var(--accent);
+  border-radius: 24px;
+  color: var(--text);
+  text-align: center;
+}
+
+.drop-overlay-card strong {
+  font-size: 1.3rem;
+}
+
+.drop-overlay-card span {
+  color: var(--muted);
+  font-size: 0.85rem;
 }
